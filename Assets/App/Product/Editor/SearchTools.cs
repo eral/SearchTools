@@ -75,29 +75,54 @@ public class SearchTools : EditorWindow {
 	/// 描画(コンポーネント)
 	/// </summary>
 	public void OnGUIForComponent() {
-		//パスフィルタ欄
-		mComponentNamePassFilter = EditorGUILayout.TextField("Name Pass Filter", mComponentNamePassFilter);
-		//検索場所
-		mLookIn = (LookIn)EditorGUILayout.EnumMaskField("Look In", mLookIn);
-		//候補コンポーネント取得
-		var componentTypes = getComponentTypes(mComponentNamePassFilter).ToArray();
-		//検索ボタン
-		var old_gui_enabled = GUI.enabled;
-		GUI.enabled = (componentTypes.Length == 1); //候補が1以外なら押せない
-		var searchLabel = string.Format("Search ({0})", componentTypes.Length);
-		GUI.SetNextControlName("SearchButton");
-		if (GUILayout.Button(searchLabel)) {
-			searchComponent(componentTypes[0]);
+		EditorGUI.BeginChangeCheck();
+		GUI.SetNextControlName("ComponentType");
+		mComponentType = (MonoScript)EditorGUILayout.ObjectField("Component Type", mComponentType, typeof(MonoScript), false);
+		if (EditorGUI.EndChangeCheck()) {
+			mComponentName = ((mComponentType != null)? mComponentType.GetClass().FullName: string.Empty);
 		}
-		//サジェスト列挙
-		if (!string.IsNullOrEmpty(mComponentNamePassFilter)) {
-			GUI.enabled = (componentTypes.Length != 1); //候補が1なら押せない
-			foreach (var type in componentTypes.Take(10)) {
-				if (GUILayout.Button(type.FullName, EditorStyles.miniButton)) {
-					mComponentNamePassFilter = type.FullName;
-					GUI.FocusControl("SearchButton");
+		mComponentNameSearch = EditorGUILayout.Foldout(mComponentNameSearch, "Name Search");
+		if (mComponentNameSearch) {
+			var nameSearchStyle = new GUIStyle();
+			var margin = nameSearchStyle.margin;
+			margin.top = 0;
+			margin.left += 12;
+			margin.bottom += 8;
+			nameSearchStyle.margin = margin;
+			EditorGUILayout.BeginVertical(nameSearchStyle);
+			//パスフィルタ欄
+			mComponentName = EditorGUILayout.TextField("Component Name", mComponentName);
+			//候補コンポーネント取得
+			var componentTypes = getComponentTypes(mComponentName).ToArray();
+			//サジェスト列挙
+			if (!string.IsNullOrEmpty(mComponentName)) {
+				foreach (var type in componentTypes.Take(10)) {
+					if (GUILayout.Button(type.FullName, EditorStyles.miniButton)) {
+						mComponentType = getMonoScript(type);
+						mComponentName = type.FullName;
+						GUI.FocusControl("ComponentType");
+					}
+				}
+				if (10 < componentTypes.Length) {
+					var label = string.Format("▾({0})", componentTypes.Length - 10);
+					var labelStyle = new GUIStyle(EditorStyles.label);
+					labelStyle.alignment = TextAnchor.UpperRight;
+					EditorGUILayout.LabelField(label, labelStyle);
 				}
 			}
+			EditorGUILayout.EndVertical();
+		}
+		//検索場所
+		mLookIn = (LookIn)EditorGUILayout.EnumMaskField("Look In", mLookIn);
+		//検索ボタン
+		var old_gui_enabled = GUI.enabled;
+		GUI.enabled = (mComponentType != null); //候補が無いなら押せない
+		if (GUILayout.Button("Search")) {
+			searchComponent(mComponentType.GetClass());
+		}
+		GUI.enabled = true;
+		if (GUILayout.Button("Reset")) {
+			reset();
 		}
 		GUI.enabled = old_gui_enabled;
 		//プレファブ結果
@@ -152,9 +177,19 @@ public class SearchTools : EditorWindow {
 	private ToolIndex mCurrentToolIndex = 0;
 
 	/// <summary>
+	/// 検索コンポーネントのMonoScript
+	/// </summary>
+	private MonoScript mComponentType = null;
+
+	/// <summary>
+	/// コンポーネント名前検索を開いているか
+	/// </summary>
+	private bool mComponentNameSearch = false;
+
+	/// <summary>
 	/// コンポーネント名パスフィルタ
 	/// </summary>
-	private string mComponentNamePassFilter = string.Empty;
+	private string mComponentName = string.Empty;
 
 	/// <summary>
 	/// ターゲットを格納しているプレファブ群
@@ -182,6 +217,18 @@ public class SearchTools : EditorWindow {
 	private void reset() {
 		mPrefabsPreservingTarget = null;
 		mScenesPreservingTarget = null;
+	}
+
+	/// <summary>
+	/// MonoScriptの取得
+	/// </summary>
+	/// <param name="type">型</param>
+	/// <returns>MonoScript</returns>
+	private static MonoScript getMonoScript(System.Type type) {
+		var go = new GameObject(string.Empty, type);
+		var result = MonoScript.FromMonoBehaviour((MonoBehaviour)go.GetComponent(type)) ;
+		DestroyImmediate(go);
+		return result;
 	}
 
 	/// <summary>
