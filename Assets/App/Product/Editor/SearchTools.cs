@@ -169,7 +169,7 @@ public class SearchTools : EditorWindow {
 	/// <summary>
 	/// 検索場所
 	/// </summary>
-	private LookIn mLookIn = LookIn.Prefab;
+	private LookIn mLookIn = LookIn.Prefab | LookIn.Scene;
 
 	/// <summary>
 	/// コンポーネント型
