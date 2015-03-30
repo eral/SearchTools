@@ -143,7 +143,35 @@ public class SearchTools : EditorWindow {
 	/// 描画(リソース)
 	/// </summary>
 	public void OnGUIForResource() {
-		EditorGUILayout.HelpBox("Not Implemented", MessageType.Info);
+		EditorGUI.BeginChangeCheck();
+		mResource = EditorGUILayout.ObjectField("Resource", mResource, typeof(Object), false);
+		if (EditorGUI.EndChangeCheck()) {
+		}
+		//検索場所
+		mLookIn = (LookIn)EditorGUILayout.EnumMaskField("Look In", mLookIn);
+		//検索ボタン
+		var old_gui_enabled = GUI.enabled;
+		GUI.enabled = (mResource != null); //候補が無いなら押せない
+		if (GUILayout.Button("Search")) {
+			searchResource(mResource);
+		}
+		GUI.enabled = true;
+		if (GUILayout.Button("Reset")) {
+			reset();
+		}
+		GUI.enabled = old_gui_enabled;
+		//プレファブ結果
+		if (mPrefabsPreservingTarget != null) {
+			foreach (var prefab in mPrefabsPreservingTarget) {
+				EditorGUILayout.ObjectField(prefab, typeof(GameObject), false);
+			}
+		}
+		//シーン結果
+		if (mScenesPreservingTarget != null) {
+			foreach (var prefab in mScenesPreservingTarget) {
+				EditorGUILayout.ObjectField(prefab, typeof(Object), false);
+			}
+		}
 	}
 
 	/// <summary>
@@ -210,6 +238,11 @@ public class SearchTools : EditorWindow {
 	/// コンポーネント型
 	/// </summary>
 	private System.Type[] mComponentTypes = null;
+
+	/// <summary>
+	/// 検索リソース
+	/// </summary>
+	private Object mResource = null;
 
 	/// <summary>
 	/// リセット
@@ -310,6 +343,110 @@ public class SearchTools : EditorWindow {
 		createEmptyScene(true);
 		EditorApplication.OpenScene(path);
 		return getTopGameObjectsInScene().Any(x=>0 < x.GetComponentsInChildren(componentType, true).Length);
+	}
+
+	/// <summary>
+	/// リソース検索
+	/// </summary>
+	/// <param name="resource">検索リソース</param>
+	private void searchResource(Object resource) {
+		reset();
+		if ((mLookIn & LookIn.Prefab) != 0) {
+			searchResourceInPrefabs(resource);
+		}
+		if ((mLookIn & LookIn.Scene) != 0) {
+			searchResourceInScenes(resource);
+		}
+	}
+
+	/// <summary>
+	/// プレファブ内リソース検索
+	/// </summary>
+	/// <param name="resource">検索リソース</param>
+	private void searchResourceInPrefabs(Object resource) {
+		if (createEmptyScene(false)) {
+			mPrefabsPreservingTarget = getAllPrefabPaths().Where(x=>hasResourceInPrefabPath(x, resource))
+														.Select(x=>(GameObject)AssetDatabase.LoadAssetAtPath(x, typeof(GameObject)))
+														.ToArray();
+			createEmptyScene(true);
+		}
+	}
+
+	/// <summary>
+	/// プレファブ内のリソース格納確認
+	/// </summary>
+	/// <param name="path">プレファブパス</param>
+	/// <param name="resource">検索リソース</param>
+	/// <returns>true:格納している、false:格納していない</returns>
+	/// <remarks>シーンを汚すので注意</remarks>
+	private bool hasResourceInPrefabPath(string path, Object resource) {
+		var gc = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath(path, typeof(GameObject)));
+		var result = hasResourceInGameObject(gc, resource);
+		DestroyImmediate(gc);
+		return result;
+	}
+
+	/// <summary>
+	/// シーン内リソース検索
+	/// </summary>
+	/// <param name="resource">検索リソース</param>
+	private void searchResourceInScenes(Object resource) {
+		if (createEmptyScene(false)) {
+			mScenesPreservingTarget = getAllScenePaths().Where(x=>hasResourceInScenePaths(x, resource))
+														.Select(x=>AssetDatabase.LoadAssetAtPath(x, typeof(Object)))
+														.ToArray();
+			createEmptyScene(true);
+		}
+	}
+
+	/// <summary>
+	/// シーン内のリソース格納確認
+	/// </summary>
+	/// <param name="path">シーンパス</param>
+	/// <param name="resource">検索リソース</param>
+	/// <returns>true:格納している、false:格納していない</returns>
+	/// <remarks>シーンを破壊ので注意</remarks>
+	private bool hasResourceInScenePaths(string path, Object resource) {
+		createEmptyScene(true);
+		EditorApplication.OpenScene(path);
+		return getTopGameObjectsInScene().Any(x=>hasResourceInGameObject(x, resource));
+	}
+
+	/// <summary>
+	/// ゲームオブジェクト内のリソース格納確認
+	/// </summary>
+	/// <param name="go">ゲームオブジェクト</param>
+	/// <param name="resource">検索リソース</param>
+	/// <returns>true:格納している、false:格納していない</returns>
+	private static bool hasResourceInGameObject(GameObject go, Object resource) {
+		List<Object> objs = new List<Object>();
+		objs.AddRange(go.GetComponentsInChildren<Component>(true));
+		while (0 < objs.Count) {
+			var sp = new SerializedObject(objs[0]).GetIterator();
+			while (sp.Next(true)) {
+				var is_valid = true;
+				is_valid = is_valid && (sp.propertyType == SerializedPropertyType.ObjectReference);	//Object型である
+				is_valid = is_valid && (sp.objectReferenceValue != null);							//nullでない
+				if (is_valid) {
+					//対象容疑オブジェクト
+					if (sp.objectReferenceValue == resource) {
+						//対象なら
+						return true;
+					} else {
+						//対象で無いなら
+						var is_child = true;
+						is_child = is_child && sp.objectReferenceValue.GetType().IsSubclassOf(typeof(Component));	//コンポーネントである
+						is_child = is_child && (sp.propertyPath != "m_PrefabParentObject");							//オリジナルプレファブへのパスでない
+						if (is_child) {
+							//中を追加検索
+							objs.Add(sp.objectReferenceValue);
+						}
+					}
+				}
+			}
+			objs.RemoveAt(0);
+		}
+		return false;
 	}
 
 	/// <summary>
