@@ -56,6 +56,7 @@ public class SearchTools : EditorWindow {
 				index = GUILayout.Toolbar(index, labels);
 				if (EditorGUI.EndChangeCheck()) {
 					mCurrentToolIndex = (ToolIndex)index;
+					reset();
 				}
 			}
 			{ //Option Part
