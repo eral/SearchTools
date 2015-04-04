@@ -437,7 +437,7 @@ public class SearchTools : EditorWindow {
 	/// <returns>true:格納している、false:格納していない</returns>
 	private static bool hasResourceInGameObject(GameObject go, Object resource) {
 		List<Object> objects = new List<Object>();
-		objects.AddRange(go.GetComponentsInChildren<Component>(true));
+		objects.Add(go);
 		var checkedObjects = objects.ToDictionary(x=>x.GetInstanceID(), x=>(object)null);
 		while (0 < objects.Count) {
 			var sp = new SerializedObject(objects[0]).GetIterator();
@@ -453,7 +453,8 @@ public class SearchTools : EditorWindow {
 					} else {
 						//対象で無いなら
 						var isChild = true;
-						isChild = isChild && (sp.propertyPath != "m_PrefabParentObject");							//オリジナルプレファブへのパスでない
+						isChild = isChild && !isFilterType(sp.objectReferenceValue.GetType());					//除外型確認
+						isChild = isChild && !isFilterPath(sp.propertyPath);									//除外パス確認
 						isChild = isChild && (!checkedObjects.ContainsKey(sp.objectReferenceInstanceIDValue));	//まだ検証されていない
 						if (isChild) {
 							//中を追加検索
@@ -466,6 +467,39 @@ public class SearchTools : EditorWindow {
 			objects.RemoveAt(0);
 		}
 		return false;
+	}
+
+	/// <summary>
+	/// 検索除外型確認
+	/// </summary>
+	/// <param name="type">型</param>
+	/// <returns>true:検索しない、false:検索する</returns>
+	private static bool isFilterType(System.Type type) {
+		var result = false;
+		if (type.IsSubclassOf(typeof(Component))) {
+			//コンポーネント系
+			result = result || type.Equals(typeof(Transform));
+			result = result || type.Equals(typeof(RectTransform));
+		} else {
+			//マテリアル系
+			result = result || type.Equals(typeof(Texture));
+			result = result || type.Equals(typeof(Texture2D));
+			result = result || type.Equals(typeof(Texture3D));
+			result = result || type.Equals(typeof(Shader));
+		}
+		return result;
+	}
+
+	/// <summary>
+	/// 検索除外パス確認
+	/// </summary>
+	/// <param name="path">パス</param>
+	/// <returns>true:検索しない、false:検索する</returns>
+	private static bool isFilterPath(string path) {
+		var result = false;
+		result = result || (path == "m_PrefabParentObject");	//オリジナルプレファブへのパスでない
+		result = result || (path == "m_PrefabInternal");		//内部プレファブへのパスでない
+		return result;
 	}
 
 	/// <summary>
