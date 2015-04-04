@@ -116,7 +116,7 @@ public class SearchTools : EditorWindow {
 		//検索場所
 		mLookIn = (LookIn)EditorGUILayout.EnumMaskField("Look In", mLookIn);
 		//検索ボタン
-		var old_gui_enabled = GUI.enabled;
+		var oldGuiEnabled = GUI.enabled;
 		GUI.enabled = (mComponentType != null); //候補が無いなら押せない
 		if (GUILayout.Button("Search")) {
 			searchComponent(mComponentType.GetClass());
@@ -125,7 +125,7 @@ public class SearchTools : EditorWindow {
 		if (GUILayout.Button("Reset")) {
 			reset();
 		}
-		GUI.enabled = old_gui_enabled;
+		GUI.enabled = oldGuiEnabled;
 		//プレファブ結果
 		if (mPrefabsPreservingTarget != null) {
 			foreach (var prefab in mPrefabsPreservingTarget) {
@@ -151,7 +151,7 @@ public class SearchTools : EditorWindow {
 		//検索場所
 		mLookIn = (LookIn)EditorGUILayout.EnumMaskField("Look In", mLookIn);
 		//検索ボタン
-		var old_gui_enabled = GUI.enabled;
+		var oldGuiEnabled = GUI.enabled;
 		GUI.enabled = (mResource != null); //候補が無いなら押せない
 		if (GUILayout.Button("Search")) {
 			searchResource(mResource);
@@ -160,7 +160,7 @@ public class SearchTools : EditorWindow {
 		if (GUILayout.Button("Reset")) {
 			reset();
 		}
-		GUI.enabled = old_gui_enabled;
+		GUI.enabled = oldGuiEnabled;
 		//プレファブ結果
 		if (mPrefabsPreservingTarget != null) {
 			foreach (var prefab in mPrefabsPreservingTarget) {
@@ -282,11 +282,11 @@ public class SearchTools : EditorWindow {
 	/// <summary>
 	/// 空のシーン作成
 	/// </summary>
-	/// <param name="is_force">強行するか</param>
+	/// <param name="isForce">強行するか</param>
 	/// <returns>true:成功、false:キャンセル</returns>
-	private bool createEmptyScene(bool is_force) {
+	private bool createEmptyScene(bool isForce) {
 		var result = false;
-		if (is_force || EditorApplication.SaveCurrentSceneIfUserWantsTo()) {
+		if (isForce || EditorApplication.SaveCurrentSceneIfUserWantsTo()) {
 			EditorApplication.NewEmptyScene();
 			result = true;
 		}
@@ -420,11 +420,11 @@ public class SearchTools : EditorWindow {
 	/// <param name="resource">検索リソース</param>
 	/// <returns>true:格納している、false:格納していない</returns>
 	private static bool hasResourceInGameObject(GameObject go, Object resource) {
-		List<Object> objs = new List<Object>();
-		objs.AddRange(go.GetComponentsInChildren<Component>(true));
-		var checkedObjects = objs.ToDictionary(x=>x.GetInstanceID(), x=>(object)null);
-		while (0 < objs.Count) {
-			var sp = new SerializedObject(objs[0]).GetIterator();
+		List<Object> objects = new List<Object>();
+		objects.AddRange(go.GetComponentsInChildren<Component>(true));
+		var checkedObjects = objects.ToDictionary(x=>x.GetInstanceID(), x=>(object)null);
+		while (0 < objects.Count) {
+			var sp = new SerializedObject(objects[0]).GetIterator();
 			while (sp.Next(true)) {
 				var isValid = true;
 				isValid = isValid && (sp.propertyType == SerializedPropertyType.ObjectReference);			//Object型である
@@ -441,13 +441,13 @@ public class SearchTools : EditorWindow {
 						isChild = isChild && (!checkedObjects.ContainsKey(sp.objectReferenceInstanceIDValue));	//まだ検証されていない
 						if (isChild) {
 							//中を追加検索
-							objs.Add(sp.objectReferenceValue);
+							objects.Add(sp.objectReferenceValue);
 							checkedObjects.Add(sp.objectReferenceInstanceIDValue, null);
 						}
 					}
 				}
 			}
-			objs.RemoveAt(0);
+			objects.RemoveAt(0);
 		}
 		return false;
 	}
@@ -519,13 +519,13 @@ public class SearchTools : EditorWindow {
 		IEnumerable<GameObject> result;
 		if (string.IsNullOrEmpty(EditorApplication.currentScene)) {
 			//シーン名が無いなら
-			var old_objects = Selection.objects;
+			var oldObjects = Selection.objects;
 			Selection.objects = Resources.FindObjectsOfTypeAll<GameObject>();
-			var result_array = Selection.GetFiltered(typeof(GameObject), SelectionMode.ExcludePrefab)
+			var results = Selection.GetFiltered(typeof(GameObject), SelectionMode.ExcludePrefab)
 										.Select(x=>(GameObject)x)
 										.ToArray();
-			result = result_array;
-			Selection.objects = old_objects;
+			result = results;
+			Selection.objects = oldObjects;
 		} else {
 			//シーン名が有るなら
 			result = Resources.FindObjectsOfTypeAll<GameObject>()
