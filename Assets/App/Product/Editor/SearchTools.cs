@@ -422,25 +422,27 @@ public class SearchTools : EditorWindow {
 	private static bool hasResourceInGameObject(GameObject go, Object resource) {
 		List<Object> objs = new List<Object>();
 		objs.AddRange(go.GetComponentsInChildren<Component>(true));
+		var checkedObjects = objs.ToDictionary(x=>x.GetInstanceID(), x=>(object)null);
 		while (0 < objs.Count) {
 			var sp = new SerializedObject(objs[0]).GetIterator();
 			while (sp.Next(true)) {
-				var is_valid = true;
-				is_valid = is_valid && (sp.propertyType == SerializedPropertyType.ObjectReference);	//Object型である
-				is_valid = is_valid && (sp.objectReferenceValue != null);							//nullでない
-				if (is_valid) {
+				var isValid = true;
+				isValid = isValid && (sp.propertyType == SerializedPropertyType.ObjectReference);			//Object型である
+				isValid = isValid && (sp.objectReferenceValue != null);									//nullでない
+				if (isValid) {
 					//対象容疑オブジェクト
 					if (sp.objectReferenceValue == resource) {
 						//対象なら
 						return true;
 					} else {
 						//対象で無いなら
-						var is_child = true;
-						is_child = is_child && sp.objectReferenceValue.GetType().IsSubclassOf(typeof(Component));	//コンポーネントである
-						is_child = is_child && (sp.propertyPath != "m_PrefabParentObject");							//オリジナルプレファブへのパスでない
-						if (is_child) {
+						var isChild = true;
+						isChild = isChild && (sp.propertyPath != "m_PrefabParentObject");							//オリジナルプレファブへのパスでない
+						isChild = isChild && (!checkedObjects.ContainsKey(sp.objectReferenceInstanceIDValue));	//まだ検証されていない
+						if (isChild) {
 							//中を追加検索
 							objs.Add(sp.objectReferenceValue);
+							checkedObjects.Add(sp.objectReferenceInstanceIDValue, null);
 						}
 					}
 				}
