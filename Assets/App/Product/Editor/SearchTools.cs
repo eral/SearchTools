@@ -299,10 +299,14 @@ public class SearchTools : EditorWindow {
 	/// <param name="componentType">検索コンポーネント型</param>
 	private void searchComponentInPrefabs(System.Type componentType) {
 		if (createEmptyScene(false)) {
-			mPrefabsPreservingTarget = getAllPrefabPaths().Where(x=>hasComponentInPrefabPath(x, componentType))
-														.Select(x=>(GameObject)AssetDatabase.LoadAssetAtPath(x, typeof(GameObject)))
-														.ToArray();
+			var prefabPaths = getAllPrefabPaths();
+			var progressWeight = 1.0f / prefabPaths.Count();
+			mPrefabsPreservingTarget = prefabPaths.TakeWhile((x,i)=>!EditorUtility.DisplayCancelableProgressBar("Search component in prefabs", x, i * progressWeight))
+												.Where(x=>hasComponentInPrefabPath(x, componentType))
+												.Select(x=>(GameObject)AssetDatabase.LoadAssetAtPath(x, typeof(GameObject)))
+												.ToArray();
 			createEmptyScene(true);
+			EditorUtility.ClearProgressBar();
 		}
 	}
 
@@ -326,10 +330,14 @@ public class SearchTools : EditorWindow {
 	/// <param name="componentType">検索コンポーネント型</param>
 	private void searchComponentInScenes(System.Type componentType) {
 		if (createEmptyScene(false)) {
-			mScenesPreservingTarget = getAllScenePaths().Where(x=>hasComponentInScenePaths(x, componentType))
-														.Select(x=>AssetDatabase.LoadAssetAtPath(x, typeof(Object)))
-														.ToArray();
+			var scenePaths = getAllScenePaths();
+			var progressWeight = 1.0f / scenePaths.Count();
+			mScenesPreservingTarget = scenePaths.TakeWhile((x,i)=>!EditorUtility.DisplayCancelableProgressBar("Search component in scenes", x, i * progressWeight))
+												.Where(x=>hasComponentInScenePaths(x, componentType))
+												.Select(x=>AssetDatabase.LoadAssetAtPath(x, typeof(Object)))
+												.ToArray();
 			createEmptyScene(true);
+			EditorUtility.ClearProgressBar();
 		}
 	}
 
@@ -366,10 +374,14 @@ public class SearchTools : EditorWindow {
 	/// <param name="resource">検索リソース</param>
 	private void searchResourceInPrefabs(Object resource) {
 		if (createEmptyScene(false)) {
-			mPrefabsPreservingTarget = getAllPrefabPaths().Where(x=>hasResourceInPrefabPath(x, resource))
-														.Select(x=>(GameObject)AssetDatabase.LoadAssetAtPath(x, typeof(GameObject)))
-														.ToArray();
+			var prefabPaths = getAllPrefabPaths();
+			var progressWeight = 1.0f / prefabPaths.Count();
+			mPrefabsPreservingTarget = prefabPaths.TakeWhile((x,i)=>!EditorUtility.DisplayCancelableProgressBar("Search component in prefabs", x, i * progressWeight))
+													.Where(x=>hasResourceInPrefabPath(x, resource))
+													.Select(x=>(GameObject)AssetDatabase.LoadAssetAtPath(x, typeof(GameObject)))
+													.ToArray();
 			createEmptyScene(true);
+			EditorUtility.ClearProgressBar();
 		}
 	}
 
@@ -393,10 +405,14 @@ public class SearchTools : EditorWindow {
 	/// <param name="resource">検索リソース</param>
 	private void searchResourceInScenes(Object resource) {
 		if (createEmptyScene(false)) {
-			mScenesPreservingTarget = getAllScenePaths().Where(x=>hasResourceInScenePaths(x, resource))
-														.Select(x=>AssetDatabase.LoadAssetAtPath(x, typeof(Object)))
-														.ToArray();
+			var scenePaths = getAllScenePaths();
+			var progressWeight = 1.0f / scenePaths.Count();
+			mScenesPreservingTarget = scenePaths.TakeWhile((x,i)=>!EditorUtility.DisplayCancelableProgressBar("Search component in scenes", x, i * progressWeight))
+												.Where(x=>hasResourceInScenePaths(x, resource))
+												.Select(x=>AssetDatabase.LoadAssetAtPath(x, typeof(Object)))
+												.ToArray();
 			createEmptyScene(true);
+			EditorUtility.ClearProgressBar();
 		}
 	}
 
