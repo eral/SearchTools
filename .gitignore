@@ -1,19 +1,15 @@
 #Unity
+/.vs
 /Library
 /Temp
-/*.booproj
+/obj
 /*.csproj
 /*.pidb
 /*.sln
+/*.sln.DotSettings
+/*.suo
 /*.unityproj
 /*.userprefs
-
-#Visual Studio Tools for Unity
-/Assets/UnityVS/
-/Assets/UnityVS.meta
-/obj
-/*.suo
-/*.sln.DotSettings
 
 #Mac
 .DS_Store
