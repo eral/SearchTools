@@ -3,6 +3,7 @@
 // (See copy at http://www.boost.org/LICENSE_1_0.txt)
 
 using UnityEngine;
+using UnityEditor.SceneManagement;
 using UnityEditor;
 using System.Collections.Generic;
 using System.Linq;
@@ -289,8 +290,8 @@ public class SearchTools : EditorWindow {
 	/// <returns>true:成功、false:キャンセル</returns>
 	private bool createEmptyScene(bool isForce) {
 		var result = false;
-		if (isForce || EditorApplication.SaveCurrentSceneIfUserWantsTo()) {
-			EditorApplication.NewEmptyScene();
+		if (isForce || EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) {
+			EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
 			result = true;
 		}
 		return result;
@@ -353,7 +354,7 @@ public class SearchTools : EditorWindow {
 	/// <remarks>シーンを破壊ので注意</remarks>
 	private bool hasComponentInScenePaths(string path, System.Type componentType) {
 		createEmptyScene(true);
-		EditorApplication.OpenScene(path);
+		EditorSceneManager.OpenScene(path);
 		return getTopGameObjectsInScene().Any(x=>0 < x.GetComponentsInChildren(componentType, true).Length);
 	}
 
@@ -428,7 +429,7 @@ public class SearchTools : EditorWindow {
 	/// <remarks>シーンを破壊ので注意</remarks>
 	private bool hasResourceInScenePaths(string path, Object resource) {
 		createEmptyScene(true);
-		EditorApplication.OpenScene(path);
+		EditorSceneManager.OpenScene(path);
 		return getTopGameObjectsInScene().Any(x=>hasResourceInGameObject(x, resource));
 	}
 
@@ -565,33 +566,12 @@ public class SearchTools : EditorWindow {
 	}
 
 	/// <summary>
-	/// シーン内の全てのゲームオブジェクトを取得する
-	/// </summary>
-	/// <returns>シーン内の全てのゲームオブジェクト</returns>
-	private static IEnumerable<GameObject> getAllGameObjectsInScene() {
-		IEnumerable<GameObject> result;
-		if (string.IsNullOrEmpty(EditorApplication.currentScene)) {
-			//シーン名が無いなら
-			var oldObjects = Selection.objects;
-			Selection.objects = Resources.FindObjectsOfTypeAll<GameObject>();
-			var results = Selection.GetFiltered(typeof(GameObject), SelectionMode.ExcludePrefab)
-										.Select(x=>(GameObject)x)
-										.ToArray();
-			result = results;
-			Selection.objects = oldObjects;
-		} else {
-			//シーン名が有るなら
-			result = Resources.FindObjectsOfTypeAll<GameObject>()
-								.Where(x=>AssetDatabase.GetAssetOrScenePath(x) == EditorApplication.currentScene);
-		}
-		return result;
-	}
-
-	/// <summary>
 	/// シーン内のトップゲームオブジェクトを取得する
 	/// </summary>
 	/// <returns>シーン内のトップゲームオブジェクト</returns>
 	private static IEnumerable<GameObject> getTopGameObjectsInScene() {
-		return getAllGameObjectsInScene().Where(x=>x.transform.parent == null);
+		return Enumerable.Range(0, EditorSceneManager.sceneCount)
+						.Select(x=>EditorSceneManager.GetSceneAt(x))
+						.SelectMany(x=>x.GetRootGameObjects());
 	}
 }
