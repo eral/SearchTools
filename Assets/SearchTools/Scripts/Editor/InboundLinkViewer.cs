@@ -10,14 +10,14 @@ using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace SearchTools {
-	public class SearchTools : EditorWindow {
+	public class InboundLinkViewer : EditorWindow {
 
 		/// <summary>
 		/// メニュー化
 		/// </summary>
-		[MenuItem("Window/Search Tools")]
+		[MenuItem("Window/Search Tools/Inbound Link Viewer")]
 		public static void Menu() {
-			var st = GetWindow<SearchTools>("Search Tools");
+			var st = GetWindow<InboundLinkViewer>("Inbound Link Viewer");
 			st.Show();
 		}
 
