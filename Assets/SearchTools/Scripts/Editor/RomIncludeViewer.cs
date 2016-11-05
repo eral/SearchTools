@@ -60,14 +60,20 @@ namespace SearchTools {
 		}
 
 		/// <summary>
-		/// 解析モード
+		/// EditorGUI.Foldoutの三角形の幅
 		/// </summary>
-		private AnalyzeMode analyzeMode = AnalyzeMode.InboundLinks;
+		private const float foldoutWidth = 10.0f;
 
 		/// <summary>
 		/// モードラベル
 		/// </summary>
-		private GUIContent[] modeLabels = System.Enum.GetNames(typeof(AnalyzeMode)).Select(x=>new GUIContent(x)).ToArray();
+		private static readonly GUIContent[] modeLabels = System.Enum.GetNames(typeof(AnalyzeMode)).Select(x=>new GUIContent(x)).ToArray();
+
+		/// <summary>
+		/// 解析モード
+		/// </summary>
+		[SerializeField]
+		private AnalyzeMode analyzeMode = AnalyzeMode.InboundLinks;
 
 		/// <summary>
 		/// リンクビューステート
@@ -89,7 +95,16 @@ namespace SearchTools {
 		/// <summary>
 		/// 解析器
 		/// </summary>
-		private LinkAnalyzer linkAnalyzer = new LinkAnalyzer();
+		private LinkAnalyzer linkAnalyzer {get{return linkAnalyzerField ?? (linkAnalyzerField = new LinkAnalyzer());}}
+		private LinkAnalyzer linkAnalyzerField = null;
+
+#if SEARCH_TOOLS_DEBUG
+		/// <summary>
+		/// GUID表示
+		/// </summary>
+		[SerializeField]
+		private bool displayGUID = false;
+#endif
 
 		/// <summary>
 		/// ツールバー
@@ -99,9 +114,23 @@ namespace SearchTools {
 			GUILayout.BeginHorizontal(EditorStyles.toolbar);
 			analyzeMode = (AnalyzeMode)GUILayout.SelectionGrid((int)analyzeMode, modeLabels, modeLabels.Length, EditorStyles.toolbarButton);
 			GUILayout.FlexibleSpace();
-			if (linkAnalyzer.progress < 1.0f) {
+#if SEARCH_TOOLS_DEBUG
+			displayGUID = GUILayout.Toggle(displayGUID, "GUID", EditorStyles.toolbarButton);
+			if (linkAnalyzer.analyzing) {
+				if (GUILayout.Button("Refresh", EditorStyles.toolbarButton)) {
+					linkAnalyzer.Refresh();
+				}
+			}
+#endif
+			{
 				var progressBarPosition = GUILayoutUtility.GetRect(60.0f, EditorStyles.toolbar.fixedHeight);
-				EditorGUI.ProgressBar(progressBarPosition, linkAnalyzer.progress, "analyzing");
+				if (linkAnalyzer.analyzing) {
+					EditorGUI.ProgressBar(progressBarPosition, linkAnalyzer.progress, "analyzing");
+				} else {
+					if (GUI.Button(progressBarPosition, "Refresh", EditorStyles.toolbarButton)) {
+						linkAnalyzer.Refresh();
+					}
+				}
 			}
 			GUILayout.EndHorizontal();
 
@@ -121,7 +150,10 @@ namespace SearchTools {
 					linkViewStates[(int)analyzeMode].scrollPosition = scrollView.scrollPosition;
 
 					var assetPath = AssetDatabase.GetAssetPath(Selection.activeObject);
-					LinkView(assetPath);
+					var guid = AssetDatabase.AssetPathToGUID(assetPath);
+					var instanceID = Selection.activeObject.GetInstanceID();
+					var fileID = Unsupported.GetLocalIdentifierInFile(instanceID);
+					LinkView(new LinkAnalyzer.AssetUniqueID(guid, fileID), string.Empty);
 				}
 			}
 		}
@@ -129,34 +161,31 @@ namespace SearchTools {
 		/// <summary>
 		/// リンクビュー
 		/// </summary>
-		private void LinkView(string assetPath) {
-			if (string.IsNullOrEmpty(assetPath)) {
-				return;
-			}
-
-			List<string> nestPaths;
+		private void LinkView(LinkAnalyzer.AssetUniqueID uniqueID, string parentFoldoutUniqueID) {
+			List<LinkAnalyzer.AssetUniqueID> nestLinks;
 			switch (analyzeMode) {
 			case AnalyzeMode.InboundLinks:
-				nestPaths = linkAnalyzer.GetInboundLinks(assetPath);
+				nestLinks = linkAnalyzer.GetInboundLinks(uniqueID);
 				break;
 			case AnalyzeMode.Links:
 			default:
-				nestPaths = linkAnalyzer.GetLinks(assetPath);
+				nestLinks = linkAnalyzer.GetLinks(uniqueID);
 				break;
 			}
-			if ((nestPaths != null) && (nestPaths.Count == 0)) {
-				nestPaths = null;
+			if ((nestLinks != null) && (nestLinks.Count == 0)) {
+				nestLinks = null;
 			}
-			var spritePackingTag = linkAnalyzer.GetSpritePackingTag(assetPath);
+			var spritePackingTag = linkAnalyzer.GetSpritePackingTag(uniqueID);
 			if (string.IsNullOrEmpty(spritePackingTag)) {
 				spritePackingTag = null;
 			}
-			var hasChild = (nestPaths != null) || (spritePackingTag != null);
+			var hasChild = (nestLinks != null) || (spritePackingTag != null);
 
-			if (!linkViewStates[(int)analyzeMode].Foldouts.ContainsKey(assetPath)) {
-				linkViewStates[(int)analyzeMode].Foldouts.Add(assetPath, false);
+			var currentFoldoutUniqueID = parentFoldoutUniqueID + "/" + uniqueID;
+			if (!linkViewStates[(int)analyzeMode].Foldouts.ContainsKey(currentFoldoutUniqueID)) {
+				linkViewStates[(int)analyzeMode].Foldouts.Add(currentFoldoutUniqueID, false);
 			}
-			var foldout = linkViewStates[(int)analyzeMode].Foldouts[assetPath];
+			var foldout = linkViewStates[(int)analyzeMode].Foldouts[currentFoldoutUniqueID];
 
 			var position = GUILayoutUtility.GetRect(EditorGUIUtility.fieldWidth, EditorGUIUtility.singleLineHeight);
 			if (hasChild) {
@@ -170,17 +199,17 @@ namespace SearchTools {
 					EditorGUI.indentLevel = indentLevel;
 				}
 				if (EditorGUI.EndChangeCheck()) {
-					linkViewStates[(int)analyzeMode].Foldouts[assetPath] = foldout;
+					linkViewStates[(int)analyzeMode].Foldouts[currentFoldoutUniqueID] = foldout;
 				}
 			}
-			position.xMin += position.height;
-			AssetField(position, assetPath);
+			position.xMin += foldoutWidth;
+			AssetField(position, uniqueID);
 
 			if (foldout) {
 				++EditorGUI.indentLevel;
-				if (nestPaths != null) {
-					foreach (var nestPath in nestPaths) {
-						LinkView(nestPath);
+				if (nestLinks != null) {
+					foreach (var nestPath in nestLinks) {
+						LinkView(nestPath, currentFoldoutUniqueID);
 					}
 				}
 				if (spritePackingTag != null) {
@@ -194,14 +223,20 @@ namespace SearchTools {
 		/// <summary>
 		/// アセットビュー
 		/// </summary>
-		private void AssetField(Rect position, string assetPath) {
+		private void AssetField(Rect position, LinkAnalyzer.AssetUniqueID uniqueID) {
+#if SEARCH_TOOLS_DEBUG
+			if (displayGUID) { 
+				var label = uniqueID.fileID.ToString("D9") + ":" + uniqueID.guid;
+				EditorGUI.LabelField(position, label);
+			} else //[fallthrough]
+#endif
+			CustomGUI.ObjectLabelField(position, uniqueID.guid, uniqueID.fileID);
+
 			var includeMarkPosition = new Rect(position);
 			includeMarkPosition.xMin = includeMarkPosition.xMax - position.height;
-			if (linkAnalyzer.IsIncludeFromPath(assetPath) == LinkAnalyzer.IsIncludeReturn.True) {
+			if (linkAnalyzer.IsInclude(uniqueID) == LinkAnalyzer.IsIncludeReturn.True) {
 				GUI.DrawTexture(includeMarkPosition, EditorGUIUtility.FindTexture("Collab"));
 			}
-
-			CustomGUI.ObjectLabelField(position, assetPath);
 		}
 
 		/// <summary>
@@ -209,15 +244,16 @@ namespace SearchTools {
 		/// </summary>
 		private void SpritePackingTagsField(string tag) {
 			var position = GUILayoutUtility.GetRect(EditorGUIUtility.fieldWidth, EditorGUIUtility.singleLineHeight);
+			position.xMin += foldoutWidth;
+
+			var label = new GUIContent(tag + " (SpritePackingTag)", EditorGUIUtility.FindTexture("PreTextureMipMapHigh"));
+			EditorGUI.LabelField(position, label);
 
 			var includeMarkPosition = new Rect(position);
 			includeMarkPosition.xMin = includeMarkPosition.xMax - position.height;
 			if (linkAnalyzer.IsIncludeFromSpritePackingTag(tag) == LinkAnalyzer.IsIncludeReturn.True) {
 				GUI.DrawTexture(includeMarkPosition, EditorGUIUtility.FindTexture("Collab"));
 			}
-
-			position =EditorGUI.IndentedRect(position);
-			EditorGUI.LabelField(position, "SpriteTag " + tag);
 		}
 
 		/// <summary>

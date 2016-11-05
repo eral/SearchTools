@@ -15,7 +15,12 @@ namespace SearchTools {
 			switch (Event.current.GetTypeForControl(controlID)) {
 			case EventType.Repaint:
 				{
-					var label = EditorGUIUtility.ObjectContent(value, value.GetType());
+					GUIContent label;
+					if (value != null) {
+						label = EditorGUIUtility.ObjectContent(value, value.GetType());
+					} else {
+						label = new GUIContent("null", EditorGUIUtility.FindTexture("CollabConflict"));
+					}
 					EditorGUI.LabelField(position, label);
 				}
 				break;
@@ -33,9 +38,14 @@ namespace SearchTools {
 		}
 		public static void ObjectLabelField(Rect position, string guid, int fileID, GUIStyle style) {
 			var assetPath = AssetDatabase.GUIDToAssetPath(guid);
-			var value = AssetDatabase.LoadAllAssetRepresentationsAtPath(assetPath)
+			Object value;
+			if (fileID != 0) {
+				value = CustomGUIDetail.LoadAllAssetsAtPath(assetPath)
 									.Where(x=>Unsupported.GetLocalIdentifierInFile(x.GetInstanceID()) == fileID)
 									.FirstOrDefault();
+			} else {
+				value = AssetDatabase.LoadMainAssetAtPath(assetPath);
+			}
 			ObjectLabelField(position, value, style);
 		}
 
@@ -44,10 +54,7 @@ namespace SearchTools {
 			ObjectLabelField(position, instanceID, style);
 		}
 		public static void ObjectLabelField(Rect position, int instanceID, GUIStyle style) {
-			var value = AssetDatabase.GetAllAssetPaths()
-									.SelectMany(x=>AssetDatabase.LoadAllAssetRepresentationsAtPath(x))
-									.Where(x=>x.GetInstanceID() == instanceID)
-									.FirstOrDefault();
+			var value = EditorUtility.InstanceIDToObject(instanceID);
 			ObjectLabelField(position, value, style);
 		}
 
@@ -85,9 +92,14 @@ namespace SearchTools {
 		}
 		public static void ObjectLabelField(string guid, int fileID, GUIStyle style, params GUILayoutOption[] options) {
 			var assetPath = AssetDatabase.GUIDToAssetPath(guid);
-			var value = AssetDatabase.LoadAllAssetRepresentationsAtPath(assetPath)
+			Object value;
+			if (fileID != 0) {
+				value = CustomGUIDetail.LoadAllAssetsAtPath(assetPath)
 									.Where(x=>Unsupported.GetLocalIdentifierInFile(x.GetInstanceID()) == fileID)
 									.FirstOrDefault();
+			} else {
+				value = AssetDatabase.LoadMainAssetAtPath(assetPath);
+			}
 			ObjectLabelField(value, style);
 		}
 
@@ -96,10 +108,7 @@ namespace SearchTools {
 			ObjectLabelField(instanceID, style);
 		}
 		public static void ObjectLabelField(int instanceID, GUIStyle style, params GUILayoutOption[] options) {
-			var value = AssetDatabase.GetAllAssetPaths()
-									.SelectMany(x=>AssetDatabase.LoadAllAssetRepresentationsAtPath(x))
-									.Where(x=>x.GetInstanceID() == instanceID)
-									.FirstOrDefault();
+			var value = EditorUtility.InstanceIDToObject(instanceID);
 			ObjectLabelField(value, style);
 		}
 
@@ -127,6 +136,13 @@ namespace SearchTools {
 			result.margin = new RectOffset();
 			//result.padding = new RectOffset();
 			return result;
+		}
+
+		public static IEnumerable<Object> LoadAllAssetsAtPath(string path) {
+			yield return AssetDatabase.LoadMainAssetAtPath(path);
+			foreach (var obj in AssetDatabase.LoadAllAssetsAtPath(path)) {
+				yield return obj;
+			}
 		}
 	}
 }
