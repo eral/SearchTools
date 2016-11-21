@@ -145,15 +145,17 @@ namespace SearchTools {
 		/// リンクビュー
 		/// </summary>
 		private void LinkView() {
-			if (Selection.activeObject != null) {
+			if ((Selection.assetGUIDs != null) && (0 < Selection.objects.Length)) {
 				using (var scrollView = new EditorGUILayout.ScrollViewScope(linkViewStates[(int)analyzeMode].scrollPosition)) {
-					linkViewStates[(int)analyzeMode].scrollPosition = scrollView.scrollPosition;
+					foreach (var obj in Selection.objects) { 
+						linkViewStates[(int)analyzeMode].scrollPosition = scrollView.scrollPosition;
 
-					var assetPath = AssetDatabase.GetAssetPath(Selection.activeObject);
-					var guid = AssetDatabase.AssetPathToGUID(assetPath);
-					var instanceID = Selection.activeObject.GetInstanceID();
-					var fileID = Unsupported.GetLocalIdentifierInFile(instanceID);
-					LinkView(new LinkAnalyzer.AssetUniqueID(guid, fileID), string.Empty);
+						var assetPath = AssetDatabase.GetAssetPath(obj);
+						var guid = AssetDatabase.AssetPathToGUID(assetPath);
+						var instanceID = obj.GetInstanceID();
+						var fileID = Unsupported.GetLocalIdentifierInFile(instanceID);
+						LinkView(new LinkAnalyzer.AssetUniqueID(guid, fileID), string.Empty);
+					}
 				}
 			}
 		}
