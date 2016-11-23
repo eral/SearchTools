@@ -145,9 +145,13 @@ namespace SearchTools {
 		/// リンクビュー
 		/// </summary>
 		private void LinkView() {
-			if ((Selection.assetGUIDs != null) && (0 < Selection.objects.Length)) {
+			if (0 < Selection.objects.Length) {
+				var sortedObjects = Selection.objects;
+				System.Array.Sort<Object>(sortedObjects, (x,y)=>{
+					return string.Compare(GetSortStringInLinkView(x), GetSortStringInLinkView(y));
+				});
 				using (var scrollView = new EditorGUILayout.ScrollViewScope(linkViewStates[(int)analyzeMode].scrollPosition)) {
-					foreach (var obj in Selection.objects) { 
+					foreach (var obj in sortedObjects) { 
 						linkViewStates[(int)analyzeMode].scrollPosition = scrollView.scrollPosition;
 
 						var assetPath = AssetDatabase.GetAssetPath(obj);
@@ -158,6 +162,23 @@ namespace SearchTools {
 					}
 				}
 			}
+		}
+
+		/// <summary>
+		/// リンクビュー内ソート用文字列取得
+		/// </summary>
+		private static string GetSortStringInLinkView(Object obj) {
+			//フォルダを前方に移動させる為に、フォルダではないオブジェクトを後方と判定させる
+			//    その為に、フォルダではないオブジェクトの手前に在るディレクトリ区切り文字を'|'(辞書順で'/'依りも後方に在る)に詐称する
+			//    当然ファイルパスとして不正な文字列に為るが、ファイルパスを返す関数では無いので問題無い
+			var names = AssetDatabase.GetAssetPath(obj).Split('/');
+			var result = names[0];
+			var path = names[0];
+			foreach (var name in names.Skip(1)) {
+				result += (AssetDatabase.IsValidFolder(path + '/' + name)? '/': '|') + name;
+				path += '/' + name;
+			}
+			return result;
 		}
 
 		/// <summary>
