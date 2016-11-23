@@ -139,7 +139,7 @@ namespace SearchTools {
 		/// スプライトパッキングタグの梱包確認
 		/// </summary>
 		public IsIncludeReturn IsIncludeFromSpritePackingTag(string tag) {
-			return IsInclude(GetUniqueIDFromSpritePackingTag(tag));
+			return IsInclude(ConvertSpritePackingTagToUniqueID(tag));
 		}
 
 		/// <summary>
@@ -214,7 +214,25 @@ namespace SearchTools {
 		/// パスからスプライトパッキングタグ取得
 		/// </summary>
 		public string GetSpritePackingTag(string path) {
-			return GetSpritePackingTag(GetUniqueIDFromSpritePackingTag(path));
+			return GetSpritePackingTag(ConvertSpritePackingTagToUniqueID(path));
+		}
+
+		/// <summary>
+		/// SpritePackingTagをユニークIDに変換
+		/// </summary>
+		public static AssetUniqueID ConvertSpritePackingTagToUniqueID(string spritePackingTag) {
+			return new AssetUniqueID(spritePackingTagsPrefix + spritePackingTag, 0);
+		}
+
+		/// <summary>
+		/// SpritePackingTagをユニークIDに変換
+		/// </summary>
+		public static string ConvertUniqueIDToSpritePackingTag(AssetUniqueID uniqueID) {
+			string result = null;
+			if (IsSpritePackingTag(uniqueID)) { 
+				result = uniqueID.guid.Substring(spritePackingTagsPrefix.Length);
+			}
+			return result;
 		}
 
 		/// <summary>
@@ -452,7 +470,7 @@ namespace SearchTools {
 							}
 						}
 						if (!string.IsNullOrEmpty(dat.spritePackingTag)) {
-							var spritePackingTagUniqueID = GetUniqueIDFromSpritePackingTag(dat.spritePackingTag);
+							var spritePackingTagUniqueID = ConvertSpritePackingTagToUniqueID(dat.spritePackingTag);
 							if (!analyzeData.ContainsKey(spritePackingTagUniqueID)) {
 								analyzeData.Add(spritePackingTagUniqueID, new AssetInfo(IsIncludeReturn.True, new List<AssetUniqueID>(), null));
 							}
@@ -769,13 +787,6 @@ namespace SearchTools {
 		}
 
 		/// <summary>
-		/// SpritePackingTagからユニークID取得
-		/// </summary>
-		private static AssetUniqueID GetUniqueIDFromSpritePackingTag(string spritePackingTag) {
-			return new AssetUniqueID(spritePackingTagsPrefix + spritePackingTag, 0);
-		}
-
-		/// <summary>
 		/// 残りを除外判定
 		/// </summary>
 		private void ExcludeForLeftovers(ref float doneCount, float progressUnit) {
@@ -791,7 +802,7 @@ namespace SearchTools {
 						var datState = IsIncludeReturn.False;
 						dat.linkInfo = linkInfo.Value;
 						if (!string.IsNullOrEmpty(dat.spritePackingTag)) {
-							var spritePackingTagUniqueID = GetUniqueIDFromSpritePackingTag(dat.spritePackingTag);
+							var spritePackingTagUniqueID = ConvertSpritePackingTagToUniqueID(dat.spritePackingTag);
 							if (!analyzeData.ContainsKey(spritePackingTagUniqueID)) {
 								analyzeData.Add(spritePackingTagUniqueID, new AssetInfo(IsIncludeReturn.False, new List<AssetUniqueID>(), null));
 							}

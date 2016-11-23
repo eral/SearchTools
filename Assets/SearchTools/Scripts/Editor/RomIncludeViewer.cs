@@ -164,8 +164,12 @@ namespace SearchTools {
 		/// リンクビュー
 		/// </summary>
 		private void LinkView(LinkAnalyzer.AssetUniqueID uniqueID, string parentFoldoutUniqueID) {
+			var isSpritePackingTag = LinkAnalyzer.IsSpritePackingTag(uniqueID);
+
 			List<LinkAnalyzer.AssetUniqueID> nestLinks;
-			switch (analyzeMode) {
+			if (isSpritePackingTag) { 
+				nestLinks = linkAnalyzer.GetLinks(uniqueID);
+			} else switch (analyzeMode) {
 			case AnalyzeMode.InboundLinks:
 				nestLinks = linkAnalyzer.GetInboundLinks(uniqueID);
 				break;
@@ -177,11 +181,11 @@ namespace SearchTools {
 			if ((nestLinks != null) && (nestLinks.Count == 0)) {
 				nestLinks = null;
 			}
-			var spritePackingTag = linkAnalyzer.GetSpritePackingTag(uniqueID);
-			if (string.IsNullOrEmpty(spritePackingTag)) {
-				spritePackingTag = null;
+			var childSpritePackingTag = linkAnalyzer.GetSpritePackingTag(uniqueID);
+			if (string.IsNullOrEmpty(childSpritePackingTag)) {
+				childSpritePackingTag = null;
 			}
-			var hasChild = (nestLinks != null) || (spritePackingTag != null);
+			var hasChild = (nestLinks != null) || (childSpritePackingTag != null);
 
 			var currentFoldoutUniqueID = parentFoldoutUniqueID + "/" + uniqueID;
 			if (!linkViewStates[(int)analyzeMode].Foldouts.ContainsKey(currentFoldoutUniqueID)) {
@@ -205,17 +209,26 @@ namespace SearchTools {
 				}
 			}
 			position.xMin += foldoutWidth;
-			AssetField(position, uniqueID);
+
+			if (isSpritePackingTag) {
+				//SpritePackingTag
+				var currentSpritePackingTag = LinkAnalyzer.ConvertUniqueIDToSpritePackingTag(uniqueID);
+				SpritePackingTagsField(position, currentSpritePackingTag);
+			} else { 
+				//Object
+				AssetField(position, uniqueID);
+			}
 
 			if (foldout) {
 				++EditorGUI.indentLevel;
 				if (nestLinks != null) {
-					foreach (var nestPath in nestLinks) {
-						LinkView(nestPath, currentFoldoutUniqueID);
+					foreach (var nestUniqueID in nestLinks) {
+						LinkView(nestUniqueID, currentFoldoutUniqueID);
 					}
 				}
-				if (spritePackingTag != null) {
-					SpritePackingTagsField(spritePackingTag);
+				if (childSpritePackingTag != null) {
+					var nestUniqueID = LinkAnalyzer.ConvertSpritePackingTagToUniqueID(childSpritePackingTag);
+					LinkView(nestUniqueID, currentFoldoutUniqueID);
 				}
 
 				--EditorGUI.indentLevel;
@@ -234,27 +247,22 @@ namespace SearchTools {
 #endif
 			CustomGUI.ObjectLabelField(position, uniqueID.guid, uniqueID.fileID);
 
-			var includeMarkPosition = new Rect(position);
-			includeMarkPosition.xMin = includeMarkPosition.xMax - position.height;
+			position.xMin = position.xMax - position.height;
 			if (linkAnalyzer.IsInclude(uniqueID) == LinkAnalyzer.IsIncludeReturn.True) {
-				GUI.DrawTexture(includeMarkPosition, EditorGUIUtility.FindTexture("Collab"));
+				GUI.DrawTexture(position, EditorGUIUtility.FindTexture("Collab"));
 			}
 		}
 
 		/// <summary>
 		/// スプライトパッキングタグビュー
 		/// </summary>
-		private void SpritePackingTagsField(string tag) {
-			var position = GUILayoutUtility.GetRect(EditorGUIUtility.fieldWidth, EditorGUIUtility.singleLineHeight);
-			position.xMin += foldoutWidth;
-
+		private void SpritePackingTagsField(Rect position, string tag) {
 			var label = new GUIContent(tag + " (SpritePackingTag)", EditorGUIUtility.FindTexture("PreTextureMipMapHigh"));
 			EditorGUI.LabelField(position, label);
 
-			var includeMarkPosition = new Rect(position);
-			includeMarkPosition.xMin = includeMarkPosition.xMax - position.height;
+			position.xMin = position.xMax - position.height;
 			if (linkAnalyzer.IsIncludeFromSpritePackingTag(tag) == LinkAnalyzer.IsIncludeReturn.True) {
-				GUI.DrawTexture(includeMarkPosition, EditorGUIUtility.FindTexture("Collab"));
+				GUI.DrawTexture(position, EditorGUIUtility.FindTexture("Collab"));
 			}
 		}
 
