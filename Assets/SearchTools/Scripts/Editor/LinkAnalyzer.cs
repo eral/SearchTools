@@ -66,6 +66,19 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// 梱包情報
+		/// </summary>
+		[System.Flags]
+		public enum IncludeStateFlags { 
+			NonInclude				= 1<<0,
+			Link					= 1<<1,
+			Scripts					= 1<<2,
+			Resources				= 1<<3,
+			ScenesInBuild			= 1<<4,
+			AlwaysIncludedShaders	= 1<<5,
+		}
+
+		/// <summary>
 		/// 解析中確認
 		/// </summary>
 		public  bool analyzing {get{
@@ -86,6 +99,37 @@ namespace SearchTools {
 			if(analyzeThread != null) {
 				analyzeThread.Abort(); 
 			}
+		}
+
+		/// <summary>
+		/// オブジェクトをユニークIDに変換
+		/// </summary>
+		public static AssetUniqueID ConvertObjectToUniqueID(Object obj) {
+			var assetPath = AssetDatabase.GetAssetPath(obj);
+			var guid = AssetDatabase.AssetPathToGUID(assetPath);
+			var result = new AssetUniqueID(guid);
+
+			bool hasFileID;
+			var linkerType = GetLinkerType(assetPath);
+			switch (linkerType) {
+			case GetLinkerTypeReturn.Home:
+			case GetLinkerTypeReturn.MetaHome:
+			case GetLinkerTypeReturn.Script:
+				hasFileID = false;
+				break;
+			case GetLinkerTypeReturn.Importer:
+				hasFileID = AssetDatabase.IsSubAsset(obj);
+				break;
+			default:
+				hasFileID = true;
+				break;
+			}
+			if (hasFileID) {
+				var instanceID = obj.GetInstanceID();
+				var fileID = Unsupported.GetLocalIdentifierInFile(instanceID);
+				result.fileID = fileID;
+			}
+			return result;
 		}
 
 		/// <summary>
@@ -118,7 +162,18 @@ namespace SearchTools {
 		public IsIncludeReturn IsInclude(AssetUniqueID uniqueID) {
 			var result = IsIncludeReturn.Unknown;
 			if (analyzeData.ContainsKey(uniqueID)) {
-				result = analyzeData[uniqueID].state;
+				var state = analyzeData[uniqueID].state;
+				switch (state) { 
+				case 0:
+					//empty.
+					break;
+				case IncludeStateFlags.NonInclude:
+					result = IsIncludeReturn.False;
+					break;
+				default:
+					result = IsIncludeReturn.True;
+					break;
+				}
 			}
 			return result;
 		}
@@ -136,6 +191,29 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// ユニークIDの梱包情報取得
+		/// </summary>
+		public IncludeStateFlags GetIncludeStateFlags(AssetUniqueID uniqueID) {
+			IncludeStateFlags result = 0;
+			if (analyzeData.ContainsKey(uniqueID)) {
+				result = analyzeData[uniqueID].state;
+			}
+			return result;
+		}
+
+		/// <summary>
+		/// パスの梱包情報取得
+		/// </summary>
+		public IncludeStateFlags GetIncludeStateFlags(string path) {
+			IncludeStateFlags result = 0;
+			if (pathToGuid.ContainsKey(path)) {
+				var uniqueID = new AssetUniqueID(pathToGuid[path]);
+				result = GetIncludeStateFlags(uniqueID);
+			}
+			return result;
+		}
+
+		/// <summary>
 		/// スプライトパッキングタグの梱包確認
 		/// </summary>
 		public IsIncludeReturn IsIncludeFromSpritePackingTag(string tag) {
@@ -147,7 +225,7 @@ namespace SearchTools {
 		/// </summary>
 		public List<AssetUniqueID> GetLinks(AssetUniqueID uniqueID) {
 			List<AssetUniqueID> result = null;
-			if (analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != IsIncludeReturn.Unknown)) {
+			if (analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
 				result = analyzeData[uniqueID].links;
 			} else if (uniqueID.fileID != 0) {
 				uniqueID.fileID = 0;
@@ -174,7 +252,7 @@ namespace SearchTools {
 		/// </summary>
 		public List<AssetUniqueID> GetInboundLinks(AssetUniqueID uniqueID) {
 			List<AssetUniqueID> result = null;
-			if (!analyzing && analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != IsIncludeReturn.Unknown)) {
+			if (!analyzing && analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
 				result = analyzeData[uniqueID].inboundLinks;
 			} else if (uniqueID.fileID != 0) {
 				uniqueID.fileID = 0;
@@ -201,7 +279,7 @@ namespace SearchTools {
 		/// </summary>
 		public string GetSpritePackingTag(AssetUniqueID uniqueID) {
 			string result = null;
-			if (!analyzing && analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != IsIncludeReturn.Unknown)) {
+			if (!analyzing && analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
 				result = analyzeData[uniqueID].spritePackingTag;
 			} else if (uniqueID.fileID != 0) {
 				uniqueID.fileID = 0;
@@ -340,18 +418,18 @@ namespace SearchTools {
 		/// アセット情報
 		/// </summary>
 		private class AssetInfo {
-			public IsIncludeReturn state;
+			public IncludeStateFlags state;
 			public LinkInfo linkInfo;
 			public List<AssetUniqueID> links {get{return linkInfo.links;} set{linkInfo.links = value;}}
 			public List<AssetUniqueID> inboundLinks;
 			public string spritePackingTag {get{return linkInfo.spritePackingTag;} set{linkInfo.spritePackingTag = value;}}
 
 			public AssetInfo() {
-				state = IsIncludeReturn.Unknown;
+				state = 0;
 				linkInfo = new LinkInfo(){links = null, spritePackingTag = null};
 				inboundLinks = null;
 			}
-			public AssetInfo(IsIncludeReturn state, List<AssetUniqueID> links, string spritePackingTag) {
+			public AssetInfo(IncludeStateFlags state, List<AssetUniqueID> links, string spritePackingTag) {
 				this.state = state;
 				linkInfo = new LinkInfo(){links = links, spritePackingTag = spritePackingTag};
 				inboundLinks = null;
@@ -430,9 +508,9 @@ namespace SearchTools {
 						analyzeData.Add(new AssetUniqueID(guid), dat);
 
 						if (-1 == path.IndexOf("/Editor/")) {
-							dat.state = IsIncludeReturn.True;
+							dat.state = IncludeStateFlags.Scripts;
 						} else {
-							dat.state = IsIncludeReturn.False;
+							dat.state = IncludeStateFlags.NonInclude;
 						}
 						++result;
 					}
@@ -449,14 +527,19 @@ namespace SearchTools {
 		/// アセット梱包判定
 		/// </summary>
 		private void AnalyzeForAsset(ref float doneCount, float progressUnit) {
+			var analyzeQueue = new Queue<string>();
+
 			//信頼されたルートの検索
-			var analyzeQueue = GetTrustedRootPaths();
+			var trustedRootPaths = GetTrustedRootPaths();
+			foreach (var trustedRootPath in trustedRootPaths.Keys) {
+				analyzeQueue.Enqueue(trustedRootPath);
+			}
 
 			while (0 < analyzeQueue.Count) {
 				var analyzePath = analyzeQueue.Dequeue();
 				var analyzeUniqueID = new AssetUniqueID(pathToGuid[analyzePath]);
 
-				if (!analyzeData.ContainsKey(analyzeUniqueID) || analyzeData[analyzeUniqueID].state == IsIncludeReturn.Unknown) {
+				if (!analyzeData.ContainsKey(analyzeUniqueID) || (analyzeData[analyzeUniqueID].state == 0)) {
 					var linkInfos = GetLinkUniqueIDsFromAssetPath(analyzePath);
 					foreach (var linkInfo in linkInfos) {
 						if (!analyzeData.ContainsKey(linkInfo.Key)) {
@@ -472,11 +555,16 @@ namespace SearchTools {
 						if (!string.IsNullOrEmpty(dat.spritePackingTag)) {
 							var spritePackingTagUniqueID = ConvertSpritePackingTagToUniqueID(dat.spritePackingTag);
 							if (!analyzeData.ContainsKey(spritePackingTagUniqueID)) {
-								analyzeData.Add(spritePackingTagUniqueID, new AssetInfo(IsIncludeReturn.True, new List<AssetUniqueID>(), null));
+								analyzeData.Add(spritePackingTagUniqueID, new AssetInfo(IncludeStateFlags.Link, new List<AssetUniqueID>(), null));
 							}
 							analyzeData[spritePackingTagUniqueID].links.Add(analyzeUniqueID);
 						}
-						dat.state = IsIncludeReturn.True;
+
+						if (trustedRootPaths.ContainsKey(analyzePath)) {
+							dat.state = trustedRootPaths[analyzePath];
+						} else {
+							dat.state = IncludeStateFlags.Link;
+						}
 					}
 
 					++doneCount;
@@ -488,26 +576,38 @@ namespace SearchTools {
 		/// <summary>
 		/// 信頼されたルートパスを取得
 		/// </summary>
-		private Queue<string> GetTrustedRootPaths() {
-			var result = new Queue<string>();
+		private Dictionary<string, IncludeStateFlags> GetTrustedRootPaths() {
+			var result = new Dictionary<string, IncludeStateFlags>();
 
 			//Scenes In Build
 			foreach (var includeScenePath in includeScenePaths) {
-				result.Enqueue(includeScenePath);
+				if (result.ContainsKey(includeScenePath)) { 
+					result[includeScenePath] |= IncludeStateFlags.ScenesInBuild;
+				} else { 
+					result.Add(includeScenePath, IncludeStateFlags.ScenesInBuild);
+				}
 			}
 
 			//Always Included Shaders
 			foreach (var uniqueID in GetLinkUniqueIDsFromAssetPath("ProjectSettings/GraphicsSettings.asset").Values.Where(x=>x.links != null).SelectMany(x=>x.links)) {
 				if (guidToPath.ContainsKey(uniqueID.guid)) {
 					var path = guidToPath[uniqueID.guid];
-					result.Enqueue(path);
+					if (result.ContainsKey(path)) { 
+						result[path] |= IncludeStateFlags.AlwaysIncludedShaders;
+					} else { 
+						result.Add(path, IncludeStateFlags.AlwaysIncludedShaders);
+					}
 				}
 			}
 
 			//Resources
 			foreach (var path in pathToGuid.Keys) {
 				if (0 <= path.IndexOf("/Resources/")) {
-					result.Enqueue(path);
+					if (result.ContainsKey(path)) { 
+						result[path] |= IncludeStateFlags.Resources;
+					} else { 
+						result.Add(path, IncludeStateFlags.Resources);
+					}
 				}
 			}
 
@@ -678,7 +778,7 @@ namespace SearchTools {
 		/// <summary>
 		/// リンカー確認
 		/// </summary>
-		private GetLinkerTypeReturn GetLinkerType(string path) {
+		private static GetLinkerTypeReturn GetLinkerType(string path) {
 			var result = GetLinkerTypeReturn.Unknown;
 
 			var extStartIndex = path.LastIndexOf('.');
@@ -752,7 +852,7 @@ namespace SearchTools {
 		/// <summary>
 		/// ディレクトリ確認
 		/// </summary>
-		private bool IsDirectory(string path) {
+		private static bool IsDirectory(string path) {
 			var fullPath = dataBasePath + path;
 			return Directory.Exists(fullPath);
 		}
@@ -792,23 +892,26 @@ namespace SearchTools {
 		private void ExcludeForLeftovers(ref float doneCount, float progressUnit) {
 			foreach(var analyzePath in pathToGuid.Keys) {
 				var analyzeUniqueID = new AssetUniqueID(pathToGuid[analyzePath]);
-				if (!analyzeData.ContainsKey(analyzeUniqueID) || analyzeData[analyzeUniqueID].state == IsIncludeReturn.Unknown) {
+				if (!analyzeData.ContainsKey(analyzeUniqueID) || analyzeData[analyzeUniqueID].state == 0) {
 					var linkInfos = GetLinkUniqueIDsFromAssetPath(analyzePath);
 					foreach (var linkInfo in linkInfos) {
 						if (!analyzeData.ContainsKey(linkInfo.Key)) {
 							analyzeData.Add(linkInfo.Key, new AssetInfo());
 						}
 						var dat = analyzeData[linkInfo.Key];
-						var datState = IsIncludeReturn.False;
+						IncludeStateFlags datState = 0;
 						dat.linkInfo = linkInfo.Value;
 						if (!string.IsNullOrEmpty(dat.spritePackingTag)) {
 							var spritePackingTagUniqueID = ConvertSpritePackingTagToUniqueID(dat.spritePackingTag);
 							if (!analyzeData.ContainsKey(spritePackingTagUniqueID)) {
-								analyzeData.Add(spritePackingTagUniqueID, new AssetInfo(IsIncludeReturn.False, new List<AssetUniqueID>(), null));
+								analyzeData.Add(spritePackingTagUniqueID, new AssetInfo(0, new List<AssetUniqueID>(), null));
 							}
 							analyzeData[spritePackingTagUniqueID].links.Add(analyzeUniqueID);
 
 							datState = analyzeData[spritePackingTagUniqueID].state;
+						}
+						if (datState == 0) { 
+							datState = IncludeStateFlags.NonInclude;
 						}
 						dat.state = datState;
 					}

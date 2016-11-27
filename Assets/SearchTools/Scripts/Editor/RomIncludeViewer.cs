@@ -154,11 +154,8 @@ namespace SearchTools {
 					foreach (var obj in sortedObjects) { 
 						linkViewStates[(int)analyzeMode].scrollPosition = scrollView.scrollPosition;
 
-						var assetPath = AssetDatabase.GetAssetPath(obj);
-						var guid = AssetDatabase.AssetPathToGUID(assetPath);
-						var instanceID = obj.GetInstanceID();
-						var fileID = Unsupported.GetLocalIdentifierInFile(instanceID);
-						LinkView(new LinkAnalyzer.AssetUniqueID(guid, fileID), string.Empty);
+						var uniqueID = LinkAnalyzer.ConvertObjectToUniqueID(obj);
+						LinkView(uniqueID, string.Empty);
 					}
 				}
 			}
@@ -208,6 +205,14 @@ namespace SearchTools {
 			}
 			var hasChild = (nestLinks != null) || (childSpritePackingTag != null);
 
+			LinkAnalyzer.IncludeStateFlags includeStateFlags = 0;
+			if (analyzeMode == AnalyzeMode.InboundLinks) {
+				includeStateFlags = linkAnalyzer.GetIncludeStateFlags(uniqueID);
+				if ((includeStateFlags != 0) && ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.NonInclude) == 0)) {
+					hasChild = true;
+				}
+			}
+
 			var currentFoldoutUniqueID = parentFoldoutUniqueID + "/" + uniqueID;
 			if (!linkViewStates[(int)analyzeMode].Foldouts.ContainsKey(currentFoldoutUniqueID)) {
 				linkViewStates[(int)analyzeMode].Foldouts.Add(currentFoldoutUniqueID, false);
@@ -252,12 +257,25 @@ namespace SearchTools {
 					LinkView(nestUniqueID, currentFoldoutUniqueID);
 				}
 
+				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.Scripts) != 0) {
+					IncludeLabelView("Scripts");
+				}
+				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.Resources) != 0) {
+					IncludeLabelView("Resources");
+				}
+				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.ScenesInBuild) != 0) {
+					IncludeLabelView("Build Settings");
+				}
+				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.AlwaysIncludedShaders) != 0) {
+					IncludeLabelView("Project Setting/Graphics Settings");
+				}
+
 				--EditorGUI.indentLevel;
 			}
 		}
 
 		/// <summary>
-		/// アセットビュー
+		/// アセットフィールド
 		/// </summary>
 		private void AssetField(Rect position, LinkAnalyzer.AssetUniqueID uniqueID) {
 #if SEARCH_TOOLS_DEBUG
@@ -275,16 +293,31 @@ namespace SearchTools {
 		}
 
 		/// <summary>
-		/// スプライトパッキングタグビュー
+		/// スプライトパッキングタグフィールド
 		/// </summary>
 		private void SpritePackingTagsField(Rect position, string tag) {
-			var label = new GUIContent(tag + " (SpritePackingTag)", EditorGUIUtility.FindTexture("PreTextureMipMapHigh"));
-			EditorGUI.LabelField(position, label);
+			var content = new GUIContent(tag + " (SpritePackingTag)", EditorGUIUtility.FindTexture("PreTextureMipMapHigh"));
+			EditorGUI.LabelField(position, content);
 
 			position.xMin = position.xMax - position.height;
 			if (linkAnalyzer.IsIncludeFromSpritePackingTag(tag) == LinkAnalyzer.IsIncludeReturn.True) {
 				GUI.DrawTexture(position, EditorGUIUtility.FindTexture("Collab"));
 			}
+		}
+
+		/// <summary>
+		/// 梱包ラベルビュー
+		/// </summary>
+		private void IncludeLabelView(string label) {
+			var position = GUILayoutUtility.GetRect(EditorGUIUtility.fieldWidth, EditorGUIUtility.singleLineHeight);
+			position.xMin += foldoutWidth;
+
+			var icon = EditorGUIUtility.FindTexture("Collab");
+			var content = new GUIContent(label, icon);
+			EditorGUI.LabelField(position, content);
+
+			position.xMin = position.xMax - position.height;
+			GUI.DrawTexture(position, EditorGUIUtility.FindTexture("Collab"));
 		}
 
 		/// <summary>
