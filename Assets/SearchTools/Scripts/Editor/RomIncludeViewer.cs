@@ -146,15 +146,15 @@ namespace SearchTools {
 		/// </summary>
 		private void LinkView() {
 			if (0 < Selection.objects.Length) {
-				var sortedObjects = Selection.objects;
-				System.Array.Sort<Object>(sortedObjects, (x,y)=>{
-					return string.Compare(GetSortStringInLinkView(x), GetSortStringInLinkView(y));
+				var sortedObjects = Selection.objects.Select(x=>new{obj = x, sortValue = GetSortStringInLinkView(x)}).ToList();
+				sortedObjects.Sort((x,y)=>{
+					return string.Compare(x.sortValue, y.sortValue);
 				});
 				using (var scrollView = new EditorGUILayout.ScrollViewScope(linkViewStates[(int)analyzeMode].scrollPosition)) {
-					foreach (var obj in sortedObjects) { 
+					foreach (var sortedObject in sortedObjects) { 
 						linkViewStates[(int)analyzeMode].scrollPosition = scrollView.scrollPosition;
 
-						var uniqueID = LinkAnalyzer.ConvertObjectToUniqueID(obj);
+						var uniqueID = LinkAnalyzer.ConvertObjectToUniqueID(sortedObject.obj);
 						LinkView(uniqueID, string.Empty);
 					}
 				}
