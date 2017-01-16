@@ -527,20 +527,26 @@ namespace SearchTools {
 		/// アセット梱包判定
 		/// </summary>
 		private void AnalyzeForAsset(ref float doneCount, float progressUnit) {
-			var analyzeQueue = new Queue<string>();
+			var analyzeQueue = new Queue<AssetUniqueID>();
 
 			//信頼されたルートの検索
 			var trustedRootPaths = GetTrustedRootPaths();
 			foreach (var trustedRootPath in trustedRootPaths.Keys) {
-				analyzeQueue.Enqueue(trustedRootPath);
+				if (pathToGuid.ContainsKey(trustedRootPath)) {
+					var trustedRootUniqueID = new AssetUniqueID(pathToGuid[trustedRootPath]);
+					analyzeQueue.Enqueue(trustedRootUniqueID);
+				}
 			}
 
 			while (0 < analyzeQueue.Count) {
-				var analyzePath = analyzeQueue.Dequeue();
-				var analyzeUniqueID = new AssetUniqueID(pathToGuid[analyzePath]);
+				var analyzeUniqueID = analyzeQueue.Dequeue();
+				var analyzePath = guidToPath[analyzeUniqueID.guid];
 
 				if (!analyzeData.ContainsKey(analyzeUniqueID) || (analyzeData[analyzeUniqueID].state == 0)) {
 					var linkInfos = GetLinkUniqueIDsFromAssetPath(analyzePath);
+					if (!linkInfos.ContainsKey(analyzeUniqueID)) {
+						analyzeUniqueID.fileID = 0;
+					}
 					foreach (var linkInfo in linkInfos) {
 						if (!analyzeData.ContainsKey(linkInfo.Key)) {
 							analyzeData.Add(linkInfo.Key, new AssetInfo());
@@ -549,7 +555,7 @@ namespace SearchTools {
 						dat.linkInfo = linkInfo.Value;
 						if ((dat.links != null)) {
 							foreach (var link in dat.links.Where(x=>x.guid != analyzeUniqueID.guid)) {
-								analyzeQueue.Enqueue(guidToPath[link.guid]);
+								analyzeQueue.Enqueue(link);
 							}
 						}
 						if (!string.IsNullOrEmpty(dat.spritePackingTag)) {
@@ -563,12 +569,32 @@ namespace SearchTools {
 						if (trustedRootPaths.ContainsKey(analyzePath)) {
 							dat.state = trustedRootPaths[analyzePath];
 						} else {
-							dat.state = IncludeStateFlags.Link;
+							if (linkInfo.Key.fileID == analyzeUniqueID.fileID) {
+								dat.state = IncludeStateFlags.Link;
+							} else {
+								dat.state = IncludeStateFlags.NonInclude;
+							}
+						}
+						if ((dat.state != IncludeStateFlags.NonInclude) && (dat.links != null)) {
+							foreach (var link in dat.links) {
+								if ((link.guid == analyzeUniqueID.guid) && linkInfos.ContainsKey(link)) {
+									analyzeQueue.Enqueue(link);
+								}
+							}
 						}
 					}
 
 					++doneCount;
 					analyzeProgress = doneCount * progressUnit;
+				} else if (analyzeData[analyzeUniqueID].state == IncludeStateFlags.NonInclude) {
+					analyzeData[analyzeUniqueID].state = IncludeStateFlags.Link;
+					if (analyzeData[analyzeUniqueID].links != null) {
+						foreach (var d in analyzeData[analyzeUniqueID].links) {
+							if (analyzeData.ContainsKey(d) && (analyzeData[d].state == IncludeStateFlags.NonInclude)) {
+								analyzeQueue.Enqueue(d);
+							}
+						}
+					}
 				}
 			}
 		}
