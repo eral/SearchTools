@@ -1004,7 +1004,7 @@ namespace SearchTools {
 					foreach(var link2 in dat.Value.links) {
 						var link = link2;
 						if (!analyzeData.ContainsKey(link)) {
-							var l = new AssetUniqueID(link.guid, 0);
+							var l = new AssetUniqueID(link.guid);
 							var noFileID = analyzeData.ContainsKey(l);
 							Debug.Log(link + ":" + ((noFileID)? "O": "X") + ":    " + guidToPath[link.guid]);
 							if (!noFileID) {
