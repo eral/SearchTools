@@ -855,7 +855,7 @@ namespace SearchTools {
 				result = GetLinkerTypeReturn.Importer;
 				break;
 			case ".wav":
-				result = GetLinkerTypeReturn.MetaApartment;
+				result = GetLinkerTypeReturn.Importer;
 				break;
 			case ".cs":
 			case ".js":
