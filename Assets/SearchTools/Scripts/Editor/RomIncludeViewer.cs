@@ -26,6 +26,13 @@ namespace SearchTools {
 			EditorApplication.projectWindowItemOnGUI += ProjectWindowItemOnGUI;
 			Selection.selectionChanged += Repaint;
 
+			includeIcons = new[]{
+				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/ExcludeIcon.png"),
+				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/IncludeIcon.png"),
+				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/UnknownIcon.png"),
+				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AmbiguousIcon.png"),
+			};
+
 			StartAnalyze();
 		}
 
@@ -97,6 +104,11 @@ namespace SearchTools {
 		/// </summary>
 		private LinkAnalyzer linkAnalyzer {get{return linkAnalyzerField ?? (linkAnalyzerField = new LinkAnalyzer());}}
 		private LinkAnalyzer linkAnalyzerField = null;
+
+		/// <summary>
+		/// 梱包判定アイコン
+		/// </summary>
+		private static Texture2D[] includeIcons;
 
 #if SEARCH_TOOLS_DEBUG
 		/// <summary>
@@ -286,10 +298,9 @@ namespace SearchTools {
 #endif
 			CustomGUI.ObjectLabelField(position, uniqueID.guid, uniqueID.fileID);
 
+			var include = linkAnalyzer.IsInclude(uniqueID);
 			position.xMin = position.xMax - position.height;
-			if (linkAnalyzer.IsInclude(uniqueID) == LinkAnalyzer.IsIncludeReturn.True) {
-				GUI.DrawTexture(position, EditorGUIUtility.FindTexture("Collab"));
-			}
+			GUI.DrawTexture(position, includeIcons[(int)include]);
 		}
 
 		/// <summary>
@@ -299,10 +310,9 @@ namespace SearchTools {
 			var content = new GUIContent(tag + " (SpritePackingTag)", EditorGUIUtility.FindTexture("PreTextureMipMapHigh"));
 			EditorGUI.LabelField(position, content);
 
+			var include = linkAnalyzer.IsIncludeFromSpritePackingTag(tag);
 			position.xMin = position.xMax - position.height;
-			if (linkAnalyzer.IsIncludeFromSpritePackingTag(tag) == LinkAnalyzer.IsIncludeReturn.True) {
-				GUI.DrawTexture(position, EditorGUIUtility.FindTexture("Collab"));
-			}
+			GUI.DrawTexture(position, includeIcons[(int)include]);
 		}
 
 		/// <summary>
@@ -312,12 +322,12 @@ namespace SearchTools {
 			var position = GUILayoutUtility.GetRect(EditorGUIUtility.fieldWidth, EditorGUIUtility.singleLineHeight);
 			position.xMin += foldoutWidth;
 
-			var icon = EditorGUIUtility.FindTexture("Collab");
+			var icon = includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True];
 			var content = new GUIContent(label, icon);
 			EditorGUI.LabelField(position, content);
 
 			position.xMin = position.xMax - position.height;
-			GUI.DrawTexture(position, EditorGUIUtility.FindTexture("Collab"));
+			GUI.DrawTexture(position, icon);
 		}
 
 		/// <summary>
@@ -328,19 +338,10 @@ namespace SearchTools {
 		private void ProjectWindowItemOnGUI(string guid, Rect selectionRect) {
 			var path = AssetDatabase.GUIDToAssetPath(guid);
 			var include = IsInclude(path);
-			if (include != LinkAnalyzer.IsIncludeReturn.False) {
-				var pos = selectionRect;
-				pos.x = pos.xMax - pos.height;
-				pos.width = pos.height;
-
-				Texture2D image = null;
-				if (include == LinkAnalyzer.IsIncludeReturn.True) {
-					image = EditorGUIUtility.FindTexture("Collab");
-				} else {
-					image = EditorGUIUtility.FindTexture("CollabNew");
-				}
-				GUI.DrawTexture(pos, image);
-			}
+			var pos = selectionRect;
+			pos.x = pos.xMax - pos.height;
+			pos.width = pos.height;
+			GUI.DrawTexture(pos, includeIcons[(int)include]);
 		}
 
 		/// <summary>

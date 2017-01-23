@@ -63,6 +63,7 @@ namespace SearchTools {
 			False,
 			True,
 			Unknown,
+			Ambiguous,
 		}
 
 		/// <summary>
@@ -184,8 +185,10 @@ namespace SearchTools {
 		public IsIncludeReturn IsIncludeFromPath(string path) {
 			var result = IsIncludeReturn.Unknown;
 			if (pathToGuid.ContainsKey(path)) {
-				var uniqueID = new AssetUniqueID(pathToGuid[path]);
-				result = IsInclude(uniqueID);
+				var guid = pathToGuid[path];
+				if (includeGuid.ContainsKey(guid)) {
+					result = includeGuid[guid];
+				}
 			}
 			return result;
 		}
@@ -331,6 +334,7 @@ namespace SearchTools {
 				}
 
 				analyzeData = new Dictionary<AssetUniqueID, AssetInfo>(allAssetPaths.Length);
+				includeGuid = new Dictionary<string, IsIncludeReturn>(allAssetPaths.Length);
 				guidToPath = new Dictionary<string, string>(allAssetPaths.Length);
 				pathToGuid = new Dictionary<string, string>(allAssetPaths.Length);
 				foreach (var path in allAssetPaths) {
@@ -452,6 +456,11 @@ namespace SearchTools {
 		private Dictionary<AssetUniqueID, AssetInfo> analyzeData = null;
 
 		/// <summary>
+		/// GUIDパス梱包結果
+		/// </summary>
+		private Dictionary<string, IsIncludeReturn> includeGuid = null;
+
+		/// <summary>
 		/// 梱包シーンパス
 		/// </summary>
 		private string[] includeScenePaths = null;
@@ -512,6 +521,8 @@ namespace SearchTools {
 						} else {
 							dat.state = IncludeStateFlags.NonInclude;
 						}
+
+						includeGuid.Add(guid,  ConvertIncludeStateFlagsToIsIncludeReturn(dat.state));
 						++result;
 					}
 					break;
@@ -542,6 +553,7 @@ namespace SearchTools {
 				var analyzeUniqueID = analyzeQueue.Dequeue();
 				var analyzePath = guidToPath[analyzeUniqueID.guid];
 
+				var nonIncludeCount = 0;
 				if (!analyzeData.ContainsKey(analyzeUniqueID) || (analyzeData[analyzeUniqueID].state == 0)) {
 					var linkInfos = GetLinkUniqueIDsFromAssetPath(analyzePath);
 					if (!linkInfos.ContainsKey(analyzeUniqueID)) {
@@ -573,6 +585,7 @@ namespace SearchTools {
 								dat.state = IncludeStateFlags.Link;
 							} else {
 								dat.state = IncludeStateFlags.NonInclude;
+								++nonIncludeCount;
 							}
 						}
 						if ((dat.state != IncludeStateFlags.NonInclude) && (dat.links != null)) {
@@ -582,6 +595,11 @@ namespace SearchTools {
 								}
 							}
 						}
+					}
+					if (!includeGuid.ContainsKey(analyzeUniqueID.guid)) {
+						includeGuid.Add(analyzeUniqueID.guid, ((0 < nonIncludeCount)? IsIncludeReturn.Ambiguous: IsIncludeReturn.True));
+					} else if ((nonIncludeCount == 0) && (includeGuid[analyzeUniqueID.guid] == IsIncludeReturn.Ambiguous)) {
+						includeGuid[analyzeUniqueID.guid] = IsIncludeReturn.True;
 					}
 
 					++doneCount;
@@ -594,6 +612,10 @@ namespace SearchTools {
 								analyzeQueue.Enqueue(d);
 							}
 						}
+					}
+					
+					if (!analyzeData.Where(x=>x.Key.guid == analyzeUniqueID.guid).Any(x=>x.Value.state == IncludeStateFlags.NonInclude)) {
+						includeGuid[analyzeUniqueID.guid] = IsIncludeReturn.True;
 					}
 				}
 			}
@@ -789,6 +811,21 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// 梱包情報を梱包判定に変換
+		/// </summary>
+		private static IsIncludeReturn ConvertIncludeStateFlagsToIsIncludeReturn(IncludeStateFlags flags) {
+			var result = IsIncludeReturn.Unknown;
+			if (flags == 0) {
+				//empty.
+			} else if (flags == IncludeStateFlags.NonInclude) {
+				result = IsIncludeReturn.False;
+			} else {
+				result = IsIncludeReturn.True;
+			}
+			return result;
+		}
+
+		/// <summary>
 		/// GetLinkerType戻り値
 		/// </summary>
 		private enum GetLinkerTypeReturn {
@@ -918,6 +955,8 @@ namespace SearchTools {
 		private void ExcludeForLeftovers(ref float doneCount, float progressUnit) {
 			foreach(var analyzePath in pathToGuid.Keys) {
 				var analyzeUniqueID = new AssetUniqueID(pathToGuid[analyzePath]);
+
+				var includeCount = 0;
 				if (!analyzeData.ContainsKey(analyzeUniqueID) || analyzeData[analyzeUniqueID].state == 0) {
 					var linkInfos = GetLinkUniqueIDsFromAssetPath(analyzePath);
 					foreach (var linkInfo in linkInfos) {
@@ -938,9 +977,16 @@ namespace SearchTools {
 						}
 						if (datState == 0) { 
 							datState = IncludeStateFlags.NonInclude;
+						} else {
+							++includeCount;
 						}
 						dat.state = datState;
 					}
+					var includeGuidState = IsIncludeReturn.False;
+					if (0 < includeCount) {
+						includeGuidState = ((linkInfos.Count == includeCount)? IsIncludeReturn.True: IsIncludeReturn.Ambiguous);
+					}
+					includeGuid.Add(analyzeUniqueID.guid, includeGuidState);
 
 					++doneCount;
 					analyzeProgress = doneCount * progressUnit;
