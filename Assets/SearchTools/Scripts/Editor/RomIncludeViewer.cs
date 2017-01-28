@@ -364,7 +364,7 @@ namespace SearchTools {
 		/// <summary>
 		/// 解析中更新
 		/// </summary>
-		public void AnalyzingUpdate() {
+		private void AnalyzingUpdate() {
 			Repaint();
 			EditorApplication.RepaintProjectWindow();
 
@@ -376,7 +376,7 @@ namespace SearchTools {
 		/// <summary>
 		/// アプリケーション終了
 		/// </summary>
-		void QuitAnalyze() {
+		private void QuitAnalyze() {
 			EditorApplication.update -= AnalyzingUpdate;
 			linkAnalyzer.Dispose();
 		}
