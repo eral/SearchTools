@@ -130,7 +130,7 @@ namespace SearchTools {
 			displayGUID = GUILayout.Toggle(displayGUID, "GUID", EditorStyles.toolbarButton);
 			if (linkAnalyzer.analyzing) {
 				if (GUILayout.Button("Refresh", EditorStyles.toolbarButton)) {
-					linkAnalyzer.Refresh();
+					Refresh();
 				}
 			}
 #endif
@@ -140,7 +140,7 @@ namespace SearchTools {
 					EditorGUI.ProgressBar(progressBarPosition, linkAnalyzer.progress, "analyzing");
 				} else {
 					if (GUI.Button(progressBarPosition, "Refresh", EditorStyles.toolbarButton)) {
-						linkAnalyzer.Refresh();
+						Refresh();
 					}
 				}
 			}
@@ -379,6 +379,14 @@ namespace SearchTools {
 		void QuitAnalyze() {
 			EditorApplication.update -= AnalyzingUpdate;
 			linkAnalyzer.Dispose();
+		}
+
+		/// <summary>
+		/// 再解析
+		/// </summary>
+		private void Refresh() {
+			linkAnalyzer.Refresh();
+			EditorApplication.update += AnalyzingUpdate;
 		}
 	}
 }
