@@ -847,55 +847,173 @@ namespace SearchTools {
 			var extStartIndex = path.LastIndexOf('.');
 			if (extStartIndex < 0) {
 				extStartIndex = path.Length;
+			} else {
+				++extStartIndex;
 			}
 			var ext = path.Substring(extStartIndex, path.Length - extStartIndex);
 			switch (ext) {
-			case ".prefab":
-			case ".unity":
+			case "prefab":
+			case "unity":
 				result = GetLinkerTypeReturn.Home;
 				break;
-			case ".anim":
-			case ".asset":
-			case ".controller":
-			case ".cubemap":
-			case ".flare":
-			case ".fontsettings":
-			case ".guiskin":
-			case ".mask":
-			case ".mat":
-			case ".mixer":
-			case ".overrideController":
+			case "anim":
+			case "asset":
+			case "colors":
+			case "controller":
+			case "cubemap":
+			case "curves":
+			case "curvesnormalized":
+			case "flare":
+			case "gradients":
+			case "guiskin":
+			case "hdr":
+			case "mask":
+			case "mat":
+			case "materiali":
+			case "mixer":
+			case "overrideController":
+			case "particlecurves":
+			case "particlecurvessigned":
+			case "particledoublecurves":
+			case "particledoublecurvessigned":
+			case "prefs":
 				result = GetLinkerTypeReturn.Apartment;
 				break;
-			case ".giparams":
-			case ".physicMaterial":
-			case ".physicsMaterial2D":
-			case ".renderTexture":
+			case "dfont":
+			case "fnt":
+			case "fon":
+			case "fontsettings":
+			case "otf":
+			case "ttf":
+				result = GetLinkerTypeReturn.Apartment;
+				break;
+			case "giparams":
+			case "physicMaterial":
+			case "physicsMaterial2D":
+			case "renderTexture":
 				result = GetLinkerTypeReturn.Home;
 				break;
-			case ".shader":
-			case ".txt":
+			case "bytes":
+			case "cginc":
+			case "csv":
+			case "htm": case ".html":
+			case "json":
+			case "shader":
+			case "txt":
+			case "xml":
+			case "yaml":
 				result = GetLinkerTypeReturn.MetaHome;
 				break;
-			case ".fbx":
+			case "3df":
+			case "3dm":
+			case "3dmf":
+			case "3ds":
+			case "3dv":
+			case "3dx":
+			case "blend":
+			case "c4d":
+			case "fbx":
+			case "lwo":
+			case "lws":
+			case "ma":
+			case "max":
+			case "mb":
+			case "mesh":
+			case "obj":
+			case "vrl":
+			case "wrl":
+			case "wrz":
 				result = GetLinkerTypeReturn.Importer;
 				break;
-			case ".bmp":
-			case ".gif":
-			case ".iff":
-			case ".jpg": case ".jpeg":
-			case ".pic": case ".pict":
-			case ".png":
-			case ".psd":
-			case ".tif": case ".tiff":
-			case ".tga":
+			case "ai":
+			case "apng":
+			case "bmp":
+			case "cdr":
+			case "dib":
+			case "eps":
+			case "exif":
+			case "exr":
+			case "gif":
+			case "ico":
+			case "icon":
+			case "iff":
+			case "j":
+			case "j2c":
+			case "j2k":
+			case "jas":
+			case "jiff":
+			case "jng":
+			case "jp2":
+			case "jpc":
+			case "jpf":
+			case "jpg": case ".jpeg": case ".jpe":
+			case "jpw":
+			case "jpx":
+			case "jtf":
+			case "mac":
+			case "omf":
+			case "pic": case ".pict":
+			case "png":
+			case "psd":
+			case "qif":
+			case "qti":
+			case "qtif":
+			case "tex":
+			case "tfw":
+			case "tga":
+			case "tif": case ".tiff":
+			case "wmf":
 				result = GetLinkerTypeReturn.Importer;
 				break;
-			case ".wav":
+			case "aac":
+			case "aif":
+			case "aiff":
+			case "au":
+			case "it":
+			case "mid":
+			case "midi":
+			case "mod":
+			case "mp3":
+			case "mpa":
+			case "ogg":
+			case "ra":
+			case "ram":
+			case "s3m":
+			case "wav": case ".wave":
+			case "wma":
+			case "xm":
 				result = GetLinkerTypeReturn.Importer;
 				break;
-			case ".cs":
-			case ".js":
+			case "asf":
+			case "asx":
+			case "avi":
+			case "dat":
+			case "divx":
+			case "dvx":
+			case "m2l":
+			case "m2t":
+			case "m2ts":
+			case "m2v":
+			case "m4e":
+			case "m4v":
+			case "mjp":
+			case "mlv":
+			case "mov":
+			case "movie":
+			case "mp21":
+			case "mp4":
+			case "mpg": case ".mpeg": case ".mpe":
+			case "mpv2":
+			case "ogm":
+			case "qt":
+			case "rm":
+			case "rmvb":
+			case "wmw":
+			case "xvid":
+				result = GetLinkerTypeReturn.Importer;
+				break;
+			case "cs":
+			case "js":
 				result = GetLinkerTypeReturn.Script;
 				break;
 			default:
