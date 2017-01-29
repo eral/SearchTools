@@ -1,11 +1,7 @@
 ﻿using UnityEngine;
-using UnityEditor.SceneManagement;
 using UnityEditor;
 using System.Collections.Generic;
 using System.Linq;
-using System.IO;
-using System.Text.RegularExpressions;
-using System.Threading;
 
 namespace SearchTools {
 	public class RomIncludeViewer : EditorWindow {
