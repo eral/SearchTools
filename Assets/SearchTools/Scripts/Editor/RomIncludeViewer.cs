@@ -275,6 +275,9 @@ namespace SearchTools {
 				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.Resources) != 0) {
 					IncludeLabelView("Resources");
 				}
+				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.StreamingAssets) != 0) {
+					IncludeLabelView("StreamingAssets");
+				}
 				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.ScenesInBuild) != 0) {
 					IncludeLabelView("Build Settings");
 				}

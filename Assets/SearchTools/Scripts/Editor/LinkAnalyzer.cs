@@ -79,8 +79,9 @@ namespace SearchTools {
 			Link					= 1<<1,
 			Scripts					= 1<<2,
 			Resources				= 1<<3,
-			ScenesInBuild			= 1<<4,
-			AlwaysIncludedShaders	= 1<<5,
+			StreamingAssets			= 1<<4,
+			ScenesInBuild			= 1<<5,
+			AlwaysIncludedShaders	= 1<<6,
 		}
 
 		/// <summary>
@@ -484,7 +485,7 @@ namespace SearchTools {
 		/// </summary>
 		private void Analyze() {
 			//スクリプト梱包判定
-			var scriptsCount = AnalyzeForScript();
+			var scriptsCount = AnalyzeForScriptsAndStreamingAssets();
 
 			var progressUnit = 1.0f / (pathToGuid.Count - scriptsCount + 2);
 			var doneCount = 0.0f;
@@ -505,9 +506,9 @@ namespace SearchTools {
 		}
 
 		/// <summary>
-		/// スクリプト梱包判定
+		/// スクリプトとStreamingAssetsの梱包判定
 		/// </summary>
-		private int AnalyzeForScript() {
+		private int AnalyzeForScriptsAndStreamingAssets() {
 			var result = 0;
 			foreach (var ptg in pathToGuid) {
 				var path = ptg.Key;
@@ -520,7 +521,9 @@ namespace SearchTools {
 						var dat = new AssetInfo();
 						analyzeData.Add(new AssetUniqueID(guid), dat);
 
-						if (-1 == path.IndexOf("/Editor/")) {
+						if (path.StartsWith("Assets/StreamingAssets/")) {
+							dat.state = IncludeStateFlags.StreamingAssets;
+						} else if (-1 == path.IndexOf("/Editor/")) {
 							dat.state = IncludeStateFlags.Scripts;
 						} else {
 							dat.state = IncludeStateFlags.NonInclude;
@@ -531,7 +534,16 @@ namespace SearchTools {
 					}
 					break;
 				default:
-					//empty.
+					{
+						if (path.StartsWith("Assets/StreamingAssets/")) {
+							var guid = ptg.Value;
+							var dat = new AssetInfo(IncludeStateFlags.StreamingAssets, null, null);
+							analyzeData.Add(new AssetUniqueID(guid), dat);
+
+							includeGuid.Add(guid,  ConvertIncludeStateFlagsToIsIncludeReturn(dat.state));
+							++result;
+						}
+					}
 					break;
 				}
 			}
@@ -848,188 +860,192 @@ namespace SearchTools {
 		private static GetLinkerTypeReturn GetLinkerType(string path) {
 			var result = GetLinkerTypeReturn.Unknown;
 
-			var extStartIndex = path.LastIndexOf('.');
-			if (extStartIndex < 0) {
-				extStartIndex = path.Length;
-			} else {
-				++extStartIndex;
-			}
-			var ext = path.Substring(extStartIndex, path.Length - extStartIndex);
-			switch (ext) {
-			case "prefab":
-			case "unity":
-				result = GetLinkerTypeReturn.Home;
-				break;
-			case "anim":
-			case "asset":
-			case "colors":
-			case "controller":
-			case "cubemap":
-			case "curves":
-			case "curvesnormalized":
-			case "flare":
-			case "gradients":
-			case "guiskin":
-			case "hdr":
-			case "mask":
-			case "mat":
-			case "materiali":
-			case "mixer":
-			case "overrideController":
-			case "particlecurves":
-			case "particlecurvessigned":
-			case "particledoublecurves":
-			case "particledoublecurvessigned":
-			case "prefs":
-				result = GetLinkerTypeReturn.Apartment;
-				break;
-			case "dfont":
-			case "fnt":
-			case "fon":
-			case "fontsettings":
-			case "otf":
-			case "ttf":
-				result = GetLinkerTypeReturn.Apartment;
-				break;
-			case "giparams":
-			case "physicMaterial":
-			case "physicsMaterial2D":
-			case "renderTexture":
-				result = GetLinkerTypeReturn.Home;
-				break;
-			case "bytes":
-			case "cginc":
-			case "csv":
-			case "htm": case ".html":
-			case "json":
-			case "shader":
-			case "txt":
-			case "xml":
-			case "yaml":
+			if (path.StartsWith("Assets/StreamingAssets/")) {
 				result = GetLinkerTypeReturn.MetaHome;
-				break;
-			case "3df":
-			case "3dm":
-			case "3dmf":
-			case "3ds":
-			case "3dv":
-			case "3dx":
-			case "blend":
-			case "c4d":
-			case "fbx":
-			case "lwo":
-			case "lws":
-			case "ma":
-			case "max":
-			case "mb":
-			case "mesh":
-			case "obj":
-			case "vrl":
-			case "wrl":
-			case "wrz":
-				result = GetLinkerTypeReturn.Importer;
-				break;
-			case "ai":
-			case "apng":
-			case "bmp":
-			case "cdr":
-			case "dib":
-			case "eps":
-			case "exif":
-			case "exr":
-			case "gif":
-			case "ico":
-			case "icon":
-			case "iff":
-			case "j":
-			case "j2c":
-			case "j2k":
-			case "jas":
-			case "jiff":
-			case "jng":
-			case "jp2":
-			case "jpc":
-			case "jpf":
-			case "jpg": case ".jpeg": case ".jpe":
-			case "jpw":
-			case "jpx":
-			case "jtf":
-			case "mac":
-			case "omf":
-			case "pic": case ".pict":
-			case "png":
-			case "psd":
-			case "qif":
-			case "qti":
-			case "qtif":
-			case "tex":
-			case "tfw":
-			case "tga":
-			case "tif": case ".tiff":
-			case "wmf":
-				result = GetLinkerTypeReturn.Importer;
-				break;
-			case "aac":
-			case "aif":
-			case "aiff":
-			case "au":
-			case "it":
-			case "mid":
-			case "midi":
-			case "mod":
-			case "mp3":
-			case "mpa":
-			case "ogg":
-			case "ra":
-			case "ram":
-			case "s3m":
-			case "wav": case ".wave":
-			case "wma":
-			case "xm":
-				result = GetLinkerTypeReturn.Importer;
-				break;
-			case "asf":
-			case "asx":
-			case "avi":
-			case "dat":
-			case "divx":
-			case "dvx":
-			case "m2l":
-			case "m2t":
-			case "m2ts":
-			case "m2v":
-			case "m4e":
-			case "m4v":
-			case "mjp":
-			case "mlv":
-			case "mov":
-			case "movie":
-			case "mp21":
-			case "mp4":
-			case "mpg": case ".mpeg": case ".mpe":
-			case "mpv2":
-			case "ogm":
-			case "qt":
-			case "rm":
-			case "rmvb":
-			case "wmw":
-			case "xvid":
-				result = GetLinkerTypeReturn.Importer;
-				break;
-			case "cs":
-			case "js":
-				result = GetLinkerTypeReturn.Script;
-				break;
-			default:
-				if (IsDirectory(path)) {
-					result = GetLinkerTypeReturn.MetaHome;
+			} else {
+				var extStartIndex = path.LastIndexOf('.');
+				if (extStartIndex < 0) {
+					extStartIndex = path.Length;
 				} else {
-#if SEARCH_TOOLS_DEBUG
-					Debug.Log("Unknown linker type:" + ext + ":" + path);
-#endif
-					result = GetLinkerTypeReturn.MetaApartment;
+					++extStartIndex;
 				}
-				break;
+				var ext = path.Substring(extStartIndex, path.Length - extStartIndex);
+				switch (ext) {
+				case "prefab":
+				case "unity":
+					result = GetLinkerTypeReturn.Home;
+					break;
+				case "anim":
+				case "asset":
+				case "colors":
+				case "controller":
+				case "cubemap":
+				case "curves":
+				case "curvesnormalized":
+				case "flare":
+				case "gradients":
+				case "guiskin":
+				case "hdr":
+				case "mask":
+				case "mat":
+				case "materiali":
+				case "mixer":
+				case "overrideController":
+				case "particlecurves":
+				case "particlecurvessigned":
+				case "particledoublecurves":
+				case "particledoublecurvessigned":
+				case "prefs":
+					result = GetLinkerTypeReturn.Apartment;
+					break;
+				case "dfont":
+				case "fnt":
+				case "fon":
+				case "fontsettings":
+				case "otf":
+				case "ttf":
+					result = GetLinkerTypeReturn.Apartment;
+					break;
+				case "giparams":
+				case "physicMaterial":
+				case "physicsMaterial2D":
+				case "renderTexture":
+					result = GetLinkerTypeReturn.Home;
+					break;
+				case "bytes":
+				case "cginc":
+				case "csv":
+				case "htm": case ".html":
+				case "json":
+				case "shader":
+				case "txt":
+				case "xml":
+				case "yaml":
+					result = GetLinkerTypeReturn.MetaHome;
+					break;
+				case "3df":
+				case "3dm":
+				case "3dmf":
+				case "3ds":
+				case "3dv":
+				case "3dx":
+				case "blend":
+				case "c4d":
+				case "fbx":
+				case "lwo":
+				case "lws":
+				case "ma":
+				case "max":
+				case "mb":
+				case "mesh":
+				case "obj":
+				case "vrl":
+				case "wrl":
+				case "wrz":
+					result = GetLinkerTypeReturn.Importer;
+					break;
+				case "ai":
+				case "apng":
+				case "bmp":
+				case "cdr":
+				case "dib":
+				case "eps":
+				case "exif":
+				case "exr":
+				case "gif":
+				case "ico":
+				case "icon":
+				case "iff":
+				case "j":
+				case "j2c":
+				case "j2k":
+				case "jas":
+				case "jiff":
+				case "jng":
+				case "jp2":
+				case "jpc":
+				case "jpf":
+				case "jpg": case ".jpeg": case ".jpe":
+				case "jpw":
+				case "jpx":
+				case "jtf":
+				case "mac":
+				case "omf":
+				case "pic": case ".pict":
+				case "png":
+				case "psd":
+				case "qif":
+				case "qti":
+				case "qtif":
+				case "tex":
+				case "tfw":
+				case "tga":
+				case "tif": case ".tiff":
+				case "wmf":
+					result = GetLinkerTypeReturn.Importer;
+					break;
+				case "aac":
+				case "aif":
+				case "aiff":
+				case "au":
+				case "it":
+				case "mid":
+				case "midi":
+				case "mod":
+				case "mp3":
+				case "mpa":
+				case "ogg":
+				case "ra":
+				case "ram":
+				case "s3m":
+				case "wav": case ".wave":
+				case "wma":
+				case "xm":
+					result = GetLinkerTypeReturn.Importer;
+					break;
+				case "asf":
+				case "asx":
+				case "avi":
+				case "dat":
+				case "divx":
+				case "dvx":
+				case "m2l":
+				case "m2t":
+				case "m2ts":
+				case "m2v":
+				case "m4e":
+				case "m4v":
+				case "mjp":
+				case "mlv":
+				case "mov":
+				case "movie":
+				case "mp21":
+				case "mp4":
+				case "mpg": case ".mpeg": case ".mpe":
+				case "mpv2":
+				case "ogm":
+				case "qt":
+				case "rm":
+				case "rmvb":
+				case "wmw":
+				case "xvid":
+					result = GetLinkerTypeReturn.Importer;
+					break;
+				case "cs":
+				case "js":
+					result = GetLinkerTypeReturn.Script;
+					break;
+				default:
+					if (IsDirectory(path)) {
+						result = GetLinkerTypeReturn.MetaHome;
+					} else {
+#if SEARCH_TOOLS_DEBUG
+						Debug.Log("Unknown linker type:" + ext + ":" + path);
+#endif
+						result = GetLinkerTypeReturn.MetaApartment;
+					}
+					break;
+				}
 			}
 			return result;
 		}
