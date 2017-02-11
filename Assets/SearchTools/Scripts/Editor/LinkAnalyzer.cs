@@ -569,6 +569,10 @@ namespace SearchTools {
 				var analyzeUniqueID = analyzeQueue.Dequeue();
 				var analyzePath = guidToPath[analyzeUniqueID.guid];
 
+				if (includeGuid.ContainsKey(analyzeUniqueID.guid) && !analyzeData.ContainsKey(analyzeUniqueID)) {
+					analyzeUniqueID.fileID = 0;
+				}
+
 				var nonIncludeCount = 0;
 				if (!analyzeData.ContainsKey(analyzeUniqueID) || (analyzeData[analyzeUniqueID].state == 0)) {
 					var linkInfos = GetLinkUniqueIDsFromAssetPath(analyzePath);
