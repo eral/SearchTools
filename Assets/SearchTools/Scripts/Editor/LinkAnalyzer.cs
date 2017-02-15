@@ -585,11 +585,7 @@ namespace SearchTools {
 						}
 						var dat = analyzeData[linkInfo.Key];
 						dat.linkInfo = linkInfo.Value;
-						if ((dat.links != null)) {
-							foreach (var link in dat.links.Where(x=>x.guid != analyzeUniqueID.guid)) {
-								analyzeQueue.Enqueue(link);
-							}
-						}
+
 						if (!string.IsNullOrEmpty(dat.spritePackingTag)) {
 							var spritePackingTagUniqueID = ConvertSpritePackingTagToUniqueID(dat.spritePackingTag);
 							if (!analyzeData.ContainsKey(spritePackingTagUniqueID)) {
@@ -608,10 +604,24 @@ namespace SearchTools {
 								++nonIncludeCount;
 							}
 						}
-						if ((dat.state != IncludeStateFlags.NonInclude) && (dat.links != null)) {
+
+						if ((dat.links != null)) {
+							//リンクしたアセットがあるなら
 							foreach (var link in dat.links) {
-								if ((link.guid == analyzeUniqueID.guid) && linkInfos.ContainsKey(link)) {
-									analyzeQueue.Enqueue(link);
+								if (link.guid == analyzeUniqueID.guid) {
+									//相席アセットなら
+									if ((dat.state != IncludeStateFlags.NonInclude) && linkInfos.ContainsKey(link)) {
+										//自アセットが梱包対象であり、対象アセットが存在するなら
+										//解析キューに積む(対象アセットが除外判定されていた場合に梱包対象に変更する為)
+										analyzeQueue.Enqueue(link);
+									}
+								} else {
+									//他アセットなら
+									if (!includeGuid.ContainsKey(link.guid)) {
+										//まだ未解析なら
+										//解析キューに積む
+										analyzeQueue.Enqueue(link);
+									}
 								}
 							}
 						}
