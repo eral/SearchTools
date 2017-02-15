@@ -586,20 +586,19 @@ namespace SearchTools {
 						var dat = analyzeData[linkInfo.Key];
 						dat.linkInfo = linkInfo.Value;
 
-						if (!string.IsNullOrEmpty(dat.spritePackingTag)) {
-							var spritePackingTagUniqueID = ConvertSpritePackingTagToUniqueID(dat.spritePackingTag);
-							if (!analyzeData.ContainsKey(spritePackingTagUniqueID)) {
-								analyzeData.Add(spritePackingTagUniqueID, new AssetInfo(IncludeStateFlags.Link, new List<AssetUniqueID>(), null));
-							}
-							analyzeData[spritePackingTagUniqueID].links.Add(analyzeUniqueID);
-						}
-
 						if (trustedRootPaths.ContainsKey(analyzePath)) {
+							//信頼されたルートなら
+							//信頼されたルートの梱包判定に従う
 							dat.state = trustedRootPaths[analyzePath];
 						} else {
+							//信頼されたルートでないなら
 							if (linkInfo.Key.fileID == analyzeUniqueID.fileID) {
+								//自アセットなら
+								//他アセットからリンクされている
 								dat.state = IncludeStateFlags.Link;
 							} else {
+								//相席アセットなら
+								//取り敢えず除外判定
 								dat.state = IncludeStateFlags.NonInclude;
 								++nonIncludeCount;
 							}
@@ -625,7 +624,18 @@ namespace SearchTools {
 								}
 							}
 						}
+
+						if (!string.IsNullOrEmpty(dat.spritePackingTag)) {
+							//スプライトパッキング対象なら
+							//スプライトパッキングとの相互リンクを構築する
+							var spritePackingTagUniqueID = ConvertSpritePackingTagToUniqueID(dat.spritePackingTag);
+							if (!analyzeData.ContainsKey(spritePackingTagUniqueID)) {
+								analyzeData.Add(spritePackingTagUniqueID, new AssetInfo(IncludeStateFlags.Link, new List<AssetUniqueID>(), null));
+							}
+							analyzeData[spritePackingTagUniqueID].links.Add(analyzeUniqueID);
+						}
 					}
+
 					if (!includeGuid.ContainsKey(analyzeUniqueID.guid)) {
 						includeGuid.Add(analyzeUniqueID.guid, ((0 < nonIncludeCount)? IsIncludeReturn.Ambiguous: IsIncludeReturn.True));
 					} else if ((nonIncludeCount == 0) && (includeGuid[analyzeUniqueID.guid] == IsIncludeReturn.Ambiguous)) {
