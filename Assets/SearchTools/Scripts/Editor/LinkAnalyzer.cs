@@ -139,6 +139,24 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// ユニークIDをオブジェクトに変換
+		/// </summary>
+		public static Object ConvertUniqueIDToObject(AssetUniqueID uniqueID) {
+			Object result = null;
+			if (IsAsset(uniqueID)) {
+				var assetPath = AssetDatabase.GUIDToAssetPath(uniqueID.guid);
+				if (uniqueID.fileID != 0) {
+					result = CustomGUIDetail.LoadAllAssetsAtPath(assetPath)
+										.Where(x=>Unsupported.GetLocalIdentifierInFile(x.GetInstanceID()) == uniqueID.fileID)
+										.FirstOrDefault();
+				} else {
+					result = AssetDatabase.LoadMainAssetAtPath(assetPath);
+				}
+			}
+			return result;
+		}
+
+		/// <summary>
 		/// アセットユニークID確認
 		/// </summary>
 		public static bool IsAsset(AssetUniqueID uniqueID) {

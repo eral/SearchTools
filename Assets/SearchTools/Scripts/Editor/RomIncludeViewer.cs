@@ -304,7 +304,10 @@ namespace SearchTools {
 				EditorGUI.LabelField(position, label);
 			} else //[fallthrough]
 #endif
-			CustomGUI.ObjectLabelField(position, uniqueID.guid, uniqueID.fileID);
+			{
+				var obj = LinkAnalyzer.ConvertUniqueIDToObject(uniqueID);
+				CustomGUI.ObjectLabelField(position, obj);
+			}
 
 			var include = linkAnalyzer.IsInclude(uniqueID);
 			position.xMin = position.xMax - position.height;
