@@ -142,7 +142,7 @@ namespace SearchTools {
 			{
 				var progressBarPosition = GUILayoutUtility.GetRect(60.0f, EditorStyles.toolbar.fixedHeight);
 				if (linkAnalyzer.analyzing) {
-					EditorGUI.ProgressBar(progressBarPosition, linkAnalyzer.progress, "analyzing");
+					EditorGUI.ProgressBar(progressBarPosition, linkAnalyzer.progress, linkAnalyzer.progress.ToString("0.00%"));
 				} else {
 					if (GUI.Button(progressBarPosition, "Refresh", EditorStyles.toolbarButton)) {
 						Refresh();
