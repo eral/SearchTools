@@ -72,6 +72,11 @@ namespace SearchTools {
 		private const float foldoutWidth = 10.0f;
 
 		/// <summary>
+		/// Projectビューに於けるリスト形式のアイテムの高さ
+		/// </summary>
+		private const float listItemHeightInProjectWindow = 16.0f;
+
+		/// <summary>
 		/// モードラベル
 		/// </summary>
 		private static readonly GUIContent[] modeLabels = System.Enum.GetNames(typeof(AnalyzeMode)).Select(x=>new GUIContent(x)).ToArray();
@@ -339,11 +344,19 @@ namespace SearchTools {
 		/// <param name="guid">GUID</param>
 		/// <param name="selectionRect">選択矩形</param>
 		private void ProjectWindowItemOnGUI(string guid, Rect selectionRect) {
+			var pos = selectionRect;
+			if (listItemHeightInProjectWindow < pos.height) {
+				//アイコン
+				pos.xMin = pos.xMax - listItemHeightInProjectWindow;
+				pos.yMin = pos.yMax - listItemHeightInProjectWindow;
+				pos.y -= listItemHeightInProjectWindow;
+			} else {
+				//リスト
+				pos.x = pos.xMax - pos.height;
+				pos.width = pos.height;
+			}
 			var path = AssetDatabase.GUIDToAssetPath(guid);
 			var include = IsInclude(path);
-			var pos = selectionRect;
-			pos.x = pos.xMax - pos.height;
-			pos.width = pos.height;
 			GUI.DrawTexture(pos, includeIcons[(int)include]);
 		}
 
