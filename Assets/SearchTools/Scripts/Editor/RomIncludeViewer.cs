@@ -32,6 +32,7 @@ namespace SearchTools {
 				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/UnknownIcon.png"),
 				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AmbiguousIcon.png"),
 			};
+			spritePackingTagIcon = EditorGUIUtility.FindTexture("PreTextureMipMapHigh");
 
 			StartAnalyze();
 		}
@@ -114,6 +115,11 @@ namespace SearchTools {
 		/// 梱包判定アイコン
 		/// </summary>
 		private static Texture2D[] includeIcons;
+
+		/// <summary>
+		/// SpritePackingTagアイコン
+		/// </summary>
+		private static Texture2D spritePackingTagIcon;
 
 #if SEARCH_TOOLS_DEBUG
 		/// <summary>
@@ -256,7 +262,11 @@ namespace SearchTools {
 			if (isSpritePackingTag) {
 				//SpritePackingTag
 				var currentSpritePackingTag = LinkAnalyzer.ConvertUniqueIDToSpritePackingTag(uniqueID);
-				SpritePackingTagsField(position, currentSpritePackingTag);
+				var label = currentSpritePackingTag + " (SpritePackingTag)";
+				var icon = spritePackingTagIcon;
+				var include = linkAnalyzer.IsIncludeFromSpritePackingTag(currentSpritePackingTag);
+				var badgeIcon = includeIcons[(int)include];
+				SpritePackingTagsField(position, label, icon, badgeIcon);
 			} else { 
 				//Object
 				AssetField(position, uniqueID);
@@ -275,19 +285,19 @@ namespace SearchTools {
 				}
 
 				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.Scripts) != 0) {
-					IncludeLabelView("Scripts");
+					IncludeLabelView("Scripts", includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True], includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True]);
 				}
 				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.Resources) != 0) {
-					IncludeLabelView("Resources");
+					IncludeLabelView("Resources", includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True], includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True]);
 				}
 				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.StreamingAssets) != 0) {
-					IncludeLabelView("StreamingAssets");
+					IncludeLabelView("StreamingAssets", includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True], includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True]);
 				}
 				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.ScenesInBuild) != 0) {
-					IncludeLabelView("Build Settings");
+					IncludeLabelView("Build Settings", includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True], includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True]);
 				}
 				if ((includeStateFlags & LinkAnalyzer.IncludeStateFlags.AlwaysIncludedShaders) != 0) {
-					IncludeLabelView("Project Setting/Graphics Settings");
+					IncludeLabelView("Project Setting/Graphics Settings", includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True], includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True]);
 				}
 
 				--EditorGUI.indentLevel;
@@ -317,28 +327,29 @@ namespace SearchTools {
 		/// <summary>
 		/// スプライトパッキングタグフィールド
 		/// </summary>
-		private void SpritePackingTagsField(Rect position, string tag) {
-			var content = new GUIContent(tag + " (SpritePackingTag)", EditorGUIUtility.FindTexture("PreTextureMipMapHigh"));
+		private void SpritePackingTagsField(Rect position, string label, Texture2D icon, Texture2D badgeIcon)  {
+			var content = new GUIContent(label, icon);
 			EditorGUI.LabelField(position, content);
 
-			var include = linkAnalyzer.IsIncludeFromSpritePackingTag(tag);
-			position.xMin = position.xMax - position.height;
-			GUI.DrawTexture(position, includeIcons[(int)include]);
+			if (badgeIcon != null) {
+				position.xMin = position.xMax - position.height;
+				GUI.DrawTexture(position, badgeIcon);
+			}
 		}
 
 		/// <summary>
 		/// 梱包ラベルビュー
 		/// </summary>
-		private void IncludeLabelView(string label) {
+		private void IncludeLabelView(string label, Texture2D icon, Texture2D badgeIcon) {
 			var position = GUILayoutUtility.GetRect(EditorGUIUtility.fieldWidth, EditorGUIUtility.singleLineHeight);
 			position.xMin += foldoutWidth;
 
-			var icon = includeIcons[(int)LinkAnalyzer.IsIncludeReturn.True];
 			var content = new GUIContent(label, icon);
 			EditorGUI.LabelField(position, content);
-
-			position.xMin = position.xMax - position.height;
-			GUI.DrawTexture(position, icon);
+			if (badgeIcon != null) {
+				position.xMin = position.xMax - position.height;
+				GUI.DrawTexture(position, badgeIcon);
+			}
 		}
 
 		/// <summary>

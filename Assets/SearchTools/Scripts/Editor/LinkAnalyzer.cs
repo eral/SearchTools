@@ -233,7 +233,8 @@ namespace SearchTools {
 		public IncludeStateFlags GetIncludeStateFlags(string path) {
 			IncludeStateFlags result = 0;
 			if (pathToGuid.ContainsKey(path)) {
-				var uniqueID = new AssetUniqueID(pathToGuid[path]);
+				var guid = pathToGuid[path];
+				var uniqueID = new AssetUniqueID(guid);
 				result = GetIncludeStateFlags(uniqueID);
 			}
 			return result;
@@ -329,7 +330,7 @@ namespace SearchTools {
 		}
 
 		/// <summary>
-		/// SpritePackingTagをユニークIDに変換
+		/// ユニークIDをSpritePackingTagに変換
 		/// </summary>
 		public static string ConvertUniqueIDToSpritePackingTag(AssetUniqueID uniqueID) {
 			string result = null;
