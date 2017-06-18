@@ -33,6 +33,7 @@ namespace SearchTools {
 				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AmbiguousIcon.png"),
 			};
 			spritePackingTagIcon = EditorGUIUtility.FindTexture("PreTextureMipMapHigh");
+			assetBundleIcon = Resources.FindObjectsOfTypeAll(typeof(Texture2D)).Select(x=>(Texture2D)x).Where(x=>x.name == "AssetLabelIcon").FirstOrDefault();
 
 			StartAnalyze();
 		}
@@ -121,6 +122,11 @@ namespace SearchTools {
 		/// </summary>
 		private static Texture2D spritePackingTagIcon;
 
+		/// <summary>
+		/// アセットバンドル梱包アイコン
+		/// </summary>
+		private static Texture2D assetBundleIcon;
+
 #if SEARCH_TOOLS_DEBUG
 		/// <summary>
 		/// GUID表示
@@ -206,9 +212,10 @@ namespace SearchTools {
 		/// </summary>
 		private void LinkView(LinkAnalyzer.AssetUniqueID uniqueID, string parentFoldoutUniqueID) {
 			var isSpritePackingTag = LinkAnalyzer.IsSpritePackingTag(uniqueID);
+			var isAssetBundle = LinkAnalyzer.IsAssetBundle(uniqueID);
 
 			List<LinkAnalyzer.AssetUniqueID> nestLinks;
-			if (isSpritePackingTag) { 
+			if (isSpritePackingTag || isAssetBundle) { 
 				nestLinks = linkAnalyzer.GetLinks(uniqueID);
 			} else switch (analyzeMode) {
 			case AnalyzeMode.InboundLinks:
@@ -265,8 +272,15 @@ namespace SearchTools {
 				var label = currentSpritePackingTag + " (SpritePackingTag)";
 				var icon = spritePackingTagIcon;
 				var include = linkAnalyzer.IsIncludeFromSpritePackingTag(currentSpritePackingTag);
-				var badgeIcon = includeIcons[(int)include];
-				SpritePackingTagsField(position, label, icon, badgeIcon);
+				var badgeIcons = new[]{includeIcons[(int)include]};
+				TreeItemField(position, label, icon, badgeIcons);
+			} else if (isAssetBundle) {
+				//AssetBundle
+				var currentAssetBundle = LinkAnalyzer.ConvertUniqueIDToAssetBundle(uniqueID);
+				var label = currentAssetBundle + " (AssetBundle)";
+				var icon = assetBundleIcon;
+				var badgeIcons = new[]{null, assetBundleIcon};
+				TreeItemField(position, label, icon, badgeIcons);
 			} else { 
 				//Object
 				AssetField(position, uniqueID);
@@ -322,18 +336,29 @@ namespace SearchTools {
 			var include = linkAnalyzer.IsInclude(uniqueID);
 			position.xMin = position.xMax - position.height;
 			GUI.DrawTexture(position, includeIcons[(int)include]);
+
+			var assetBundle = (linkAnalyzer.GetIncludeStateFlags(uniqueID) & LinkAnalyzer.IncludeStateFlags.AssetBundle) != 0;
+			if (assetBundle) {
+				position.x -= position.width;
+				GUI.DrawTexture(position, assetBundleIcon);
+			}
 		}
 
 		/// <summary>
-		/// スプライトパッキングタグフィールド
+		/// ツリーアイテムフィールド
 		/// </summary>
-		private void SpritePackingTagsField(Rect position, string label, Texture2D icon, Texture2D badgeIcon)  {
+		private void TreeItemField(Rect position, string label, Texture2D icon, params Texture2D[] badgeIcons)  {
 			var content = new GUIContent(label, icon);
 			EditorGUI.LabelField(position, content);
 
-			if (badgeIcon != null) {
+			if (badgeIcons != null) {
 				position.xMin = position.xMax - position.height;
-				GUI.DrawTexture(position, badgeIcon);
+				foreach (var badgeIcon in badgeIcons) {
+					if (badgeIcon != null) {
+						GUI.DrawTexture(position, badgeIcon);
+					}
+					position.x -= position.width;
+				}
 			}
 		}
 

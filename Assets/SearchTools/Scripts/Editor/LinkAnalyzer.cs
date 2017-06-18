@@ -76,12 +76,13 @@ namespace SearchTools {
 		[System.Flags]
 		public enum IncludeStateFlags { 
 			NonInclude				= 1<<0,
-			Link					= 1<<1,
-			Scripts					= 1<<2,
-			Resources				= 1<<3,
-			StreamingAssets			= 1<<4,
-			ScenesInBuild			= 1<<5,
-			AlwaysIncludedShaders	= 1<<6,
+			AssetBundle				= 1<<1,
+			Link					= 1<<2,
+			Scripts					= 1<<3,
+			Resources				= 1<<4,
+			StreamingAssets			= 1<<5,
+			ScenesInBuild			= 1<<6,
+			AlwaysIncludedShaders	= 1<<7,
 		}
 
 		/// <summary>
@@ -187,22 +188,27 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// アセットバンドルユニークID確認
+		/// </summary>
+		public static bool IsAssetBundle(AssetUniqueID uniqueID) {
+			var result = false;
+			if (!string.IsNullOrEmpty(uniqueID.guid)) {
+				result = uniqueID.guid.StartsWith(assetBundlesPrefix);
+				result = result && (uniqueID.fileID == 0);
+			}
+			return result;
+		}
+
+		/// <summary>
 		/// ユニークIDの梱包確認
 		/// </summary>
 		public IsIncludeReturn IsInclude(AssetUniqueID uniqueID) {
 			var result = IsIncludeReturn.Unknown;
 			if (analyzeData.ContainsKey(uniqueID)) {
 				var state = analyzeData[uniqueID].state;
-				switch (state) { 
-				case 0:
-					//empty.
-					break;
-				case IncludeStateFlags.NonInclude:
-					result = IsIncludeReturn.False;
-					break;
-				default:
-					result = IsIncludeReturn.True;
-					break;
+				if (state != 0) {
+					state &= ~(IncludeStateFlags.NonInclude | IncludeStateFlags.AssetBundle);
+					result = (((state != 0))? IsIncludeReturn.True: IsIncludeReturn.False);
 				}
 			}
 			return result;
@@ -347,6 +353,24 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// AssetBundleをユニークIDに変換
+		/// </summary>
+		public static AssetUniqueID ConvertAssetBundleToUniqueID(string assetBundle) {
+			return new AssetUniqueID(assetBundlesPrefix + assetBundle, 0);
+		}
+
+		/// <summary>
+		/// ユニークIDをAssetBundleに変換
+		/// </summary>
+		public static string ConvertUniqueIDToAssetBundle(AssetUniqueID uniqueID) {
+			string result = null;
+			if (IsAssetBundle(uniqueID)) { 
+				result = uniqueID.guid.Substring(assetBundlesPrefix.Length);
+			}
+			return result;
+		}
+
+		/// <summary>
 		/// 開始
 		/// </summary>
 		public void Start() {
@@ -472,6 +496,11 @@ namespace SearchTools {
 		private const string spritePackingTagsPrefix = "SpritePackingTags/";
 
 		/// <summary>
+		/// AssetBundleパスのプレフィックス
+		/// </summary>
+		private const string assetBundlesPrefix = "AssetBundles/";
+
+		/// <summary>
 		/// 解析結果
 		/// </summary>
 		private Dictionary<AssetUniqueID, AssetInfo> analyzeData = null;
@@ -497,6 +526,16 @@ namespace SearchTools {
 		private Dictionary<string, string> pathToGuid = null;
 
 		/// <summary>
+		/// アセットバンドル梱包バス辞書
+		/// </summary>
+		private Dictionary<string, string[]> assetPathsFromAssetBundle = null;
+
+		/// <summary>
+		/// アセットバンドルリンク辞書
+		/// </summary>
+		private Dictionary<string, string[]> assetBundleLinks = null;
+
+		/// <summary>
 		/// 解析開始
 		/// </summary>
 		private void AnalyzeStart() {
@@ -520,6 +559,17 @@ namespace SearchTools {
 				pathToGuid = new Dictionary<string, string>();
 			} else {
 				pathToGuid.Clear();
+			}
+
+			if (assetPathsFromAssetBundle == null) {
+				assetPathsFromAssetBundle = new Dictionary<string, string[]>();
+			} else {
+				assetPathsFromAssetBundle.Clear();
+			}
+			if (assetBundleLinks == null) {
+				assetBundleLinks = new Dictionary<string, string[]>();
+			} else {
+				assetBundleLinks.Clear();
 			}
 
 			analyzeOnMainThreadUpdate = AnalyzeOnMainThread();
@@ -573,6 +623,14 @@ namespace SearchTools {
 				}
 			}
 
+			var allAssetBundleNames = AssetDatabase.GetAllAssetBundleNames();
+			foreach (var assetBundleName in allAssetBundleNames) {
+				assetPathsFromAssetBundle.Add(assetBundleName, AssetDatabase.GetAssetPathsFromAssetBundle(assetBundleName));
+				yield return null;
+				assetBundleLinks.Add(assetBundleName, AssetDatabase.GetAssetBundleDependencies(assetBundleName, false));
+				yield return null;
+			}
+
 #if SEARCH_TOOLS_DEBUG
 			analyzeThread = 0;
 			Analyze();
@@ -591,7 +649,7 @@ namespace SearchTools {
 			//スクリプト梱包判定
 			var scriptsCount = AnalyzeForScriptsAndStreamingAssets();
 
-			var progressUnit = 1.0f / (pathToGuid.Count - scriptsCount + 2);
+			var progressUnit = 1.0f / (pathToGuid.Count - scriptsCount + 3); //FileIDNormalize,,AddAssetBundleFlag,AnalyzeForInboundLinkの合計でdoneCountが3増えるので、その分も考慮
 			var doneCount = 0.0f;
 
 			//アセット梱包判定
@@ -602,6 +660,9 @@ namespace SearchTools {
 
 			//fileIDの正規化
 			FileIDNormalize(ref doneCount, progressUnit);
+
+			//アセットバンドル属性付与
+			AddAssetBundleFlag(ref doneCount, progressUnit);
 
 			//逆リンク判定
 			AnalyzeForInboundLink(ref doneCount, progressUnit);
@@ -1304,6 +1365,28 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// アセットバンドル属性付与
+		/// </summary>
+		private void AddAssetBundleFlag(ref float doneCount, float progressUnit) {
+			foreach(var assetBundle in assetPathsFromAssetBundle) {
+				var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
+				var links = new List<AssetUniqueID>();
+				if (!analyzeData.ContainsKey(assetBundleUniqueID)) {
+					foreach (var path in assetBundle.Value) {
+						var guid = pathToGuid[path];
+						links.AddRange(analyzeData.Where(x=>x.Key.guid == guid).Select(x=>x.Key));
+					}
+				}
+				if (links.Count == 0) {
+					links = null;
+				}
+				analyzeData.Add(assetBundleUniqueID, new AssetInfo(IncludeStateFlags.AssetBundle, links, null));
+			}
+			++doneCount;
+			analyzeProgress = doneCount * progressUnit;
+		}
+
+		/// <summary>
 		/// 逆リンク判定
 		/// </summary>
 		private void AnalyzeForInboundLink(ref float doneCount, float progressUnit) {
@@ -1340,9 +1423,16 @@ namespace SearchTools {
 			foreach(var assetInfo in analyzeData.Values) {
 				if (assetInfo.inboundLinks != null) {
 					assetInfo.inboundLinks.Sort((x,y)=>{
-						var compare = string.Compare(guidToPath[x.guid], guidToPath[y.guid]);
-						if (compare == 0) {
-							compare = x.fileID - y.fileID;
+						int compare;
+						if (!guidToPath.ContainsKey(y.guid)) {
+							compare = -1;
+						} else if (!guidToPath.ContainsKey(x.guid)) {
+							compare = 1;
+						} else {
+							compare = string.Compare(guidToPath[x.guid], guidToPath[y.guid]);
+							if (compare == 0) {
+								compare = x.fileID - y.fileID;
+							}
 						}
 						return compare;
 					});
