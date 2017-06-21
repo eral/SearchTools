@@ -103,7 +103,9 @@ namespace SearchTools {
 		/// </summary>
 		public void Dispose() {
 			if(analyzeThread != null) {
-				analyzeThread.Abort(); 
+#if !SEARCH_TOOLS_DEBUG
+				analyzeThread.Abort();
+#endif
 			}
 		}
 
@@ -366,10 +368,11 @@ namespace SearchTools {
 						var guid = AssetDatabase.AssetPathToGUID(path);
 						guidToPath.Add(guid, path);
 						pathToGuid.Add(path, guid);
-					}
-				}
+			}
+		}
 
 #if SEARCH_TOOLS_DEBUG
+				analyzeThread = 0;
 				Analyze();
 #else
 				analyzeThread = new Thread(Analyze);
@@ -383,7 +386,9 @@ namespace SearchTools {
 		/// </summary>
 		public void Refresh() {
 			if(analyzeThread != null) {
-				analyzeThread.Abort(); 
+#if !SEARCH_TOOLS_DEBUG
+				analyzeThread.Abort();
+#endif
 			}
 			analyzeProgress = 0.0f;
 			Start();
@@ -392,7 +397,11 @@ namespace SearchTools {
 		/// <summary>
 		/// 解析スレッド
 		/// </summary>
+#if SEARCH_TOOLS_DEBUG
+		private int? analyzeThread = null;
+#else
 		private Thread analyzeThread = null;
+#endif
 
 		/// <summary>
 		/// 解析進捗
