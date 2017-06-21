@@ -88,7 +88,7 @@ namespace SearchTools {
 		/// 解析中確認
 		/// </summary>
 		public  bool analyzing {get{
-			return analyzeThread != null;
+			return (analyzeOnMainThreadUpdate != null) || (analyzeThread != null);
 		}}
 
 		/// <summary>
@@ -102,10 +102,14 @@ namespace SearchTools {
 		/// IDisposableインターフェース
 		/// </summary>
 		public void Dispose() {
+			if(analyzeOnMainThreadUpdate != null) {
+				analyzeOnMainThreadUpdate = null;
+			}
 			if(analyzeThread != null) {
 #if !SEARCH_TOOLS_DEBUG
 				analyzeThread.Abort();
 #endif
+				analyzeThread = null;
 			}
 		}
 
@@ -347,37 +351,7 @@ namespace SearchTools {
 		/// </summary>
 		public void Start() {
 			if (analyzeProgress == 0.0f) {
-				var allAssetPaths = AssetDatabase.GetAllAssetPaths();
-
-				includeScenePaths = EditorBuildSettings.scenes.Where(x=>x.enabled)
-														.Select(x=>x.path)
-														.ToArray();
-				if (includeScenePaths.Length == 0) {
-					var activeScenePath = EditorSceneManager.GetActiveScene().path;
-					if (!string.IsNullOrEmpty(activeScenePath)) {
-						includeScenePaths = new[]{activeScenePath};
-					}
-				}
-
-				analyzeData = new Dictionary<AssetUniqueID, AssetInfo>(allAssetPaths.Length);
-				includeGuid = new Dictionary<string, IsIncludeReturn>(allAssetPaths.Length);
-				guidToPath = new Dictionary<string, string>(allAssetPaths.Length);
-				pathToGuid = new Dictionary<string, string>(allAssetPaths.Length);
-				foreach (var path in allAssetPaths) {
-					if (path.StartsWith(assetsPrefix)) {
-						var guid = AssetDatabase.AssetPathToGUID(path);
-						guidToPath.Add(guid, path);
-						pathToGuid.Add(path, guid);
-			}
-		}
-
-#if SEARCH_TOOLS_DEBUG
-				analyzeThread = 0;
-				Analyze();
-#else
-				analyzeThread = new Thread(Analyze);
-				analyzeThread.Start();
-#endif
+				AnalyzeStart();
 			}
 		}
 
@@ -385,14 +359,28 @@ namespace SearchTools {
 		/// リフレッシュ
 		/// </summary>
 		public void Refresh() {
+			if(analyzeOnMainThreadUpdate != null) {
+				analyzeOnMainThreadUpdate = null;
+			}
 			if(analyzeThread != null) {
 #if !SEARCH_TOOLS_DEBUG
 				analyzeThread.Abort();
 #endif
+				analyzeThread = null;
 			}
 			analyzeProgress = 0.0f;
 			Start();
 		}
+
+		/// <summary>
+		/// メインスレッド解析のフレーム毎稼動上限秒
+		/// </summary>
+		private const float mainThreadUpdateTimeLimitSecond = 0.016f;
+
+		/// <summary>
+		/// メインスレッド解析用コルーチン
+		/// </summary>
+		private IEnumerator<object> analyzeOnMainThreadUpdate;
 
 		/// <summary>
 		/// 解析スレッド
@@ -510,6 +498,94 @@ namespace SearchTools {
 
 		/// <summary>
 		/// 解析開始
+		/// </summary>
+		private void AnalyzeStart() {
+			includeScenePaths = null;
+			if (analyzeData == null) {
+				analyzeData = new Dictionary<AssetUniqueID, AssetInfo>();
+			} else {
+				analyzeData.Clear();
+			}
+			if (includeGuid == null) {
+				includeGuid = new Dictionary<string, IsIncludeReturn>();
+			} else {
+				includeGuid.Clear();
+			}
+			if (guidToPath == null) {
+				guidToPath = new Dictionary<string, string>();
+			} else {
+				guidToPath.Clear();
+			}
+			if (pathToGuid == null) {
+				pathToGuid = new Dictionary<string, string>();
+			} else {
+				pathToGuid.Clear();
+			}
+
+			analyzeOnMainThreadUpdate = AnalyzeOnMainThread();
+			EditorApplication.update += AnalyzeOnMainThreadUpdate;
+		}
+
+		/// <summary>
+		/// メインスレッド解析用更新
+		/// </summary>
+		private void AnalyzeOnMainThreadUpdate() {
+			var startTime = Time.realtimeSinceStartup;
+
+			do {
+				if (analyzeOnMainThreadUpdate == null) {
+					EditorApplication.update -= AnalyzeOnMainThreadUpdate;
+					break;
+				} else if (!analyzeOnMainThreadUpdate.MoveNext()) {
+					analyzeOnMainThreadUpdate = null;
+					EditorApplication.update -= AnalyzeOnMainThreadUpdate;
+					break;
+				} else {
+				}
+			} while ((Time.realtimeSinceStartup - startTime) < mainThreadUpdateTimeLimitSecond);
+		}
+
+		/// <summary>
+		/// メインスレッド解析
+		/// </summary>
+		private IEnumerator<object> AnalyzeOnMainThread() {
+			var allAssetPaths = AssetDatabase.GetAllAssetPaths();
+			yield return null;
+
+			includeScenePaths = EditorBuildSettings.scenes.Where(x=>x.enabled)
+													.Select(x=>x.path)
+													.ToArray();
+			if (includeScenePaths.Length == 0) {
+				yield return null;
+				var activeScenePath = EditorSceneManager.GetActiveScene().path;
+				if (!string.IsNullOrEmpty(activeScenePath)) {
+					includeScenePaths = new[]{activeScenePath};
+				}
+			}
+			yield return null;
+
+			foreach (var path in allAssetPaths) {
+				if (path.StartsWith(assetsPrefix)) {
+					var guid = AssetDatabase.AssetPathToGUID(path);
+					guidToPath.Add(guid, path);
+					pathToGuid.Add(path, guid);
+					yield return null;
+				}
+			}
+
+#if SEARCH_TOOLS_DEBUG
+			analyzeThread = 0;
+			Analyze();
+#else
+			analyzeThread = new Thread(Analyze);
+			analyzeThread.Start();
+#endif
+
+			yield break;
+		}
+
+		/// <summary>
+		/// 解析
 		/// </summary>
 		private void Analyze() {
 			//スクリプト梱包判定
