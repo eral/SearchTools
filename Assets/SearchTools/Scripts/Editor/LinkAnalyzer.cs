@@ -1455,7 +1455,7 @@ namespace SearchTools {
 			if (0 == assetPathsFromAssetBundle.Count) {
 				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, 0);
 			} else {
-				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, assetPathsFromAssetBundle.Count + analyzeData.Count);
+				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, assetPathsFromAssetBundle.Count * 2 + analyzeData.Count);
 
 				var guidToAssetBundleAssetInfo = new Dictionary<string, AssetInfo>();
 				foreach(var assetBundle in assetPathsFromAssetBundle) {
@@ -1471,11 +1471,35 @@ namespace SearchTools {
 					}
 					IncrementAnalyzeProgress();
 				}
+				foreach(var assetBundle in assetPathsFromAssetBundle) {
+					var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
+					var assetInfo = analyzeData[assetBundleUniqueID];
+					foreach(var link in assetBundleLinks[assetBundle.Key]) {
+						var linkAssetBundleUniqueID = ConvertAssetBundleToUniqueID(link);
+						assetInfo.links.Add(linkAssetBundleUniqueID);
+					}
+					IncrementAnalyzeProgress();
+				}
 
+				var links = new Queue<AssetUniqueID>();
 				foreach (var dat in analyzeData) {
 					if (guidToAssetBundleAssetInfo.ContainsKey(dat.Key.guid)) {
 						var assetInfo = guidToAssetBundleAssetInfo[dat.Key.guid];
 						assetInfo.links.Add(dat.Key);
+
+						links.Enqueue(dat.Key);
+						while (0 < links.Count) {
+							var linkAssetUniqueID = links.Dequeue();
+							var linkObject = analyzeData[linkAssetUniqueID];
+							if ((linkObject.state & IncludeStateFlags.AssetBundle) == 0) {
+								linkObject.state |= IncludeStateFlags.AssetBundle;
+								if (linkObject.links != null) {
+									foreach (var nestlinkObject in linkObject.links) {
+										links.Enqueue(nestlinkObject);
+									}
+								}
+							}
+						}
 					}
 					IncrementAnalyzeProgress();
 				}
