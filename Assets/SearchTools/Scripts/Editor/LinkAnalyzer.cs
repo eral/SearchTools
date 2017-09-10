@@ -291,7 +291,7 @@ namespace SearchTools {
 		/// </summary>
 		public List<AssetUniqueID> GetInboundLinks(AssetUniqueID uniqueID) {
 			List<AssetUniqueID> result = null;
-			if (!analyzing && analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
+			if (analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
 				result = analyzeData[uniqueID].inboundLinks;
 			} else if (uniqueID.fileID != 0) {
 				uniqueID.fileID = 0;
@@ -318,7 +318,7 @@ namespace SearchTools {
 		/// </summary>
 		public string GetSpritePackingTag(AssetUniqueID uniqueID) {
 			string result = null;
-			if (!analyzing && analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
+			if (analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
 				result = analyzeData[uniqueID].spritePackingTag;
 			} else if (uniqueID.fileID != 0) {
 				uniqueID.fileID = 0;
@@ -753,9 +753,10 @@ namespace SearchTools {
 		/// </summary>
 		private IEnumerator<object> AnalyzeAssetBundleOnMainThread() {
 			var allAssetBundleNames = AssetDatabase.GetAllAssetBundleNames();
-			SetAnalyzeProgressRange(analyzeProgressAnalyzeOnMainThreadAssetBundles, allAssetBundleNames.Length);
-
 			if (0 < allAssetBundleNames.Length) {
+				ResetAnalyzeProgress();
+				SetAnalyzeProgressRange(analyzeProgressAnalyzeOnMainThreadAssetBundles, allAssetBundleNames.Length);
+
 				foreach (var assetBundleName in allAssetBundleNames) {
 					assetPathsFromAssetBundle.Add(assetBundleName, AssetDatabase.GetAssetPathsFromAssetBundle(assetBundleName));
 					assetBundleLinks.Add(assetBundleName, AssetDatabase.GetAssetBundleDependencies(assetBundleName, false));
@@ -1462,13 +1463,7 @@ namespace SearchTools {
 							}
 						}
 					}
-					links.Sort((x,y)=>{
-						var compare = string.Compare(guidToPath[x.guid], guidToPath[y.guid]);
-						if (compare == 0) {
-							compare = x.fileID - y.fileID;
-						}
-						return compare;
-					});
+					links.Sort(linksSortComparison);
 				}
 
 				IncrementAnalyzeProgress();
@@ -1515,20 +1510,7 @@ namespace SearchTools {
 			}
 			foreach(var assetInfo in analyzeData.Values) {
 				if (assetInfo.inboundLinks != null) {
-					assetInfo.inboundLinks.Sort((x,y)=>{
-						int compare;
-						if (!guidToPath.ContainsKey(y.guid)) {
-							compare = -1;
-						} else if (!guidToPath.ContainsKey(x.guid)) {
-							compare = 1;
-						} else {
-							compare = string.Compare(guidToPath[x.guid], guidToPath[y.guid]);
-							if (compare == 0) {
-								compare = x.fileID - y.fileID;
-							}
-						}
-						return compare;
-					});
+					assetInfo.inboundLinks.Sort(linksSortComparison);
 				}
 				IncrementAnalyzeProgress();
 			}
@@ -1543,35 +1525,49 @@ namespace SearchTools {
 			} else {
 				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, assetPathsFromAssetBundle.Count * 2 + analyzeData.Count);
 
-				var guidToAssetBundleAssetInfo = new Dictionary<string, AssetInfo>();
+				//アセットバンドルの解析ノード登録と梱包アセットパスの逆引き辞書構築
+				var guidToAssetBundleAssetInfo = new Dictionary<string, AssetUniqueID>();
 				foreach(var assetBundle in assetPathsFromAssetBundle) {
 					var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
-					var assetInfo = new AssetInfo(IncludeStateFlags.AssetBundle, new List<AssetUniqueID>(), null);
-					analyzeData.Add(assetBundleUniqueID, assetInfo);
+					var assetBundleAssetInfo = new AssetInfo(IncludeStateFlags.AssetBundle, new List<AssetUniqueID>(), null);
+					analyzeData.Add(assetBundleUniqueID, assetBundleAssetInfo);
 
 					foreach(var path in assetBundle.Value) {
 						if (pathToGuid.ContainsKey(path)) {
 							var guid = pathToGuid[path];
-							guidToAssetBundleAssetInfo.Add(guid, assetInfo);
+							guidToAssetBundleAssetInfo.Add(guid, assetBundleUniqueID);
 						}
 					}
 					IncrementAnalyzeProgress();
 				}
+				//アセットバンドル間のリンク・逆リンク構築
 				foreach(var assetBundle in assetPathsFromAssetBundle) {
 					var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
-					var assetInfo = analyzeData[assetBundleUniqueID];
+					var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
 					foreach(var link in assetBundleLinks[assetBundle.Key]) {
 						var linkAssetBundleUniqueID = ConvertAssetBundleToUniqueID(link);
-						assetInfo.links.Add(linkAssetBundleUniqueID);
+						assetBundleAssetInfo.links.Add(linkAssetBundleUniqueID);
+
+						var linkAssetInfo = analyzeData[linkAssetBundleUniqueID];
+						if (linkAssetInfo.inboundLinks == null) {
+							linkAssetInfo.inboundLinks = new List<AssetUniqueID>();
+						}
+						linkAssetInfo.inboundLinks.Add(assetBundleUniqueID);
 					}
 					IncrementAnalyzeProgress();
 				}
-
+				//アセットバンドルと梱包アセットのリンク・逆リンク構築
 				var links = new Queue<AssetUniqueID>();
 				foreach (var dat in analyzeData) {
 					if (guidToAssetBundleAssetInfo.ContainsKey(dat.Key.guid)) {
-						var assetInfo = guidToAssetBundleAssetInfo[dat.Key.guid];
-						assetInfo.links.Add(dat.Key);
+						var assetBundleUniqueID = guidToAssetBundleAssetInfo[dat.Key.guid];
+						var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
+						assetBundleAssetInfo.links.Add(dat.Key);
+						var assetInfo = analyzeData[dat.Key];
+						if (assetInfo.inboundLinks == null) {
+							assetInfo.inboundLinks = new List<AssetUniqueID>();
+						}
+						assetInfo.inboundLinks.Add(assetBundleUniqueID);
 
 						links.Enqueue(dat.Key);
 						while (0 < links.Count) {
@@ -1589,7 +1585,32 @@ namespace SearchTools {
 					}
 					IncrementAnalyzeProgress();
 				}
+				//アセットバンドルのリンク・逆リンクをソート
+				foreach(var assetBundle in assetPathsFromAssetBundle) {
+					var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
+					var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
+					assetBundleAssetInfo.links.Sort(linksSortComparison);
+//					IncrementAnalyzeProgress();
+				}
 			}
+		}
+
+		/// <summary>
+		/// リンク・逆リンクのソート
+		/// </summary>
+		private int linksSortComparison(AssetUniqueID x, AssetUniqueID y) {
+			int result;
+			if (!guidToPath.ContainsKey(y.guid)) {
+				result = -1;
+			} else if (!guidToPath.ContainsKey(x.guid)) {
+				result = 1;
+			} else {
+				result = string.Compare(guidToPath[x.guid], guidToPath[y.guid]);
+				if (result == 0) {
+					result = x.fileID - y.fileID;
+				}
+			}
+			return result;
 		}
 	}
 }
