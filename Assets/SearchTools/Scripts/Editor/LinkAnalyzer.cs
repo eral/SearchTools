@@ -672,7 +672,6 @@ namespace SearchTools {
 					analyzeOnMainThreadUpdate = null;
 					EditorApplication.update -= AnalyzeOnMainThreadUpdate;
 					break;
-				} else {
 				}
 			} while ((Time.realtimeSinceStartup - startTime) < mainThreadUpdateTimeLimitSecond);
 		}
