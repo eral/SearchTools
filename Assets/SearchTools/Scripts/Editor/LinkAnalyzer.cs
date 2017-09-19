@@ -711,7 +711,7 @@ namespace SearchTools {
 
 #if SEARCH_TOOLS_DEBUG
 			analyzeThread = 0;
-			Analyze();
+			EditorApplication.delayCall += Analyze;
 #else
 			analyzeThread = new Thread(Analyze);
 			analyzeThread.Start();
@@ -765,7 +765,7 @@ namespace SearchTools {
 
 #if SEARCH_TOOLS_DEBUG
 				analyzeThread = 0;
-				AnalyzeAssetBundle();
+				EditorApplication.delayCall += AnalyzeAssetBundle;
 #else
 				analyzeThread = new Thread(AnalyzeAssetBundle);
 				analyzeThread.Start();
