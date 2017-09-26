@@ -229,6 +229,20 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// パスのアセットバンドル梱包確認
+		/// </summary>
+		public IsIncludeReturn IsAssetBundleFromPath(string path) {
+			var result = IsIncludeReturn.Unknown;
+			if (pathToGuid.ContainsKey(path)) {
+				var guid = pathToGuid[path];
+				if (assetBundleGuid.ContainsKey(guid)) {
+					result = assetBundleGuid[guid];
+				}
+			}
+			return result;
+		}
+
+		/// <summary>
 		/// ユニークIDの梱包情報取得
 		/// </summary>
 		public IncludeStateFlags GetIncludeStateFlags(AssetUniqueID uniqueID) {
@@ -556,6 +570,11 @@ namespace SearchTools {
 		private Dictionary<string, IsIncludeReturn> includeGuid = null;
 
 		/// <summary>
+		/// GUIDアセットバンドル梱包結果
+		/// </summary>
+		private Dictionary<string, IsIncludeReturn> assetBundleGuid = null;
+
+		/// <summary>
 		/// 梱包シーンパス
 		/// </summary>
 		private string[] includeScenePaths = null;
@@ -631,6 +650,11 @@ namespace SearchTools {
 				includeGuid = new Dictionary<string, IsIncludeReturn>();
 			} else {
 				includeGuid.Clear();
+			}
+			if (assetBundleGuid == null) {
+				assetBundleGuid = new Dictionary<string, IsIncludeReturn>();
+			} else {
+				assetBundleGuid.Clear();
 			}
 			if (guidToPath == null) {
 				guidToPath = new Dictionary<string, string>();
@@ -1558,6 +1582,9 @@ namespace SearchTools {
 				//アセットバンドルと梱包アセットのリンク・逆リンク構築
 				var links = new Queue<AssetUniqueID>();
 				foreach (var dat in analyzeData) {
+					if (!assetBundleGuid.ContainsKey(dat.Key.guid)) {
+						assetBundleGuid[dat.Key.guid] = IsIncludeReturn.False;
+					}
 					if (guidToAssetBundleAssetInfo.ContainsKey(dat.Key.guid)) {
 						var assetBundleUniqueID = guidToAssetBundleAssetInfo[dat.Key.guid];
 						var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
@@ -1578,6 +1605,11 @@ namespace SearchTools {
 									foreach (var nestlinkObject in linkObject.links) {
 										links.Enqueue(nestlinkObject);
 									}
+								}
+								if (assetBundleGuid.ContainsKey(linkAssetUniqueID.guid)) {
+									assetBundleGuid[linkAssetUniqueID.guid] = IsIncludeReturn.True;
+								} else {
+									assetBundleGuid.Add(linkAssetUniqueID.guid, IsIncludeReturn.True);
 								}
 							}
 						}

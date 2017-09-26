@@ -397,6 +397,11 @@ namespace SearchTools {
 			var path = AssetDatabase.GUIDToAssetPath(guid);
 			var include = IsInclude(path);
 			GUI.DrawTexture(pos, includeIcons[(int)include]);
+			var assetBundle = IsAssetBundle(path);
+			if (assetBundle == LinkAnalyzer.IsIncludeReturn.True) {
+				pos.x -= pos.width;
+				GUI.DrawTexture(pos, assetBundleIcon);
+			}
 		}
 
 		/// <summary>
@@ -406,6 +411,15 @@ namespace SearchTools {
 		/// <returns>true:梱包される, false:梱包されない</returns>
 		private LinkAnalyzer.IsIncludeReturn IsInclude(string path) {
 			return linkAnalyzer.IsIncludeFromPath(path);
+		}
+
+		/// <summary>
+		/// アセットバンドル梱包確認
+		/// </summary>
+		/// <param name="path">パス</param>
+		/// <returns>true:アセットバンドルに梱包される, false:梱包されない</returns>
+		private LinkAnalyzer.IsIncludeReturn IsAssetBundle(string path) {
+			return linkAnalyzer.IsAssetBundleFromPath(path);
 		}
 
 		/// <summary>
