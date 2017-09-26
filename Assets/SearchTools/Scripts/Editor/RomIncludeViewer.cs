@@ -33,7 +33,7 @@ namespace SearchTools {
 				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AmbiguousIcon.png"),
 			};
 			spritePackingTagIcon = EditorGUIUtility.FindTexture("PreTextureMipMapHigh");
-			assetBundleIcon = Resources.FindObjectsOfTypeAll(typeof(Texture2D)).Select(x=>(Texture2D)x).Where(x=>x.name == "AssetLabelIcon").FirstOrDefault();
+			assetBundleIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AssetBundleIcon.png");
 
 			StartAnalyze();
 		}
