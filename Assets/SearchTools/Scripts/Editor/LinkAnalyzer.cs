@@ -231,12 +231,12 @@ namespace SearchTools {
 		/// <summary>
 		/// パスのアセットバンドル梱包確認
 		/// </summary>
-		public IsIncludeReturn IsAssetBundleFromPath(string path) {
+		public IsIncludeReturn IsAssetBundleIncludeFromPath(string path) {
 			var result = IsIncludeReturn.Unknown;
 			if (pathToGuid.ContainsKey(path)) {
 				var guid = pathToGuid[path];
-				if (assetBundleGuid.ContainsKey(guid)) {
-					result = assetBundleGuid[guid];
+				if (assetBundleIncludeGuid.ContainsKey(guid)) {
+					result = assetBundleIncludeGuid[guid];
 				}
 			}
 			return result;
@@ -572,7 +572,7 @@ namespace SearchTools {
 		/// <summary>
 		/// GUIDアセットバンドル梱包結果
 		/// </summary>
-		private Dictionary<string, IsIncludeReturn> assetBundleGuid = null;
+		private Dictionary<string, IsIncludeReturn> assetBundleIncludeGuid = null;
 
 		/// <summary>
 		/// 梱包シーンパス
@@ -651,10 +651,10 @@ namespace SearchTools {
 			} else {
 				includeGuid.Clear();
 			}
-			if (assetBundleGuid == null) {
-				assetBundleGuid = new Dictionary<string, IsIncludeReturn>();
+			if (assetBundleIncludeGuid == null) {
+				assetBundleIncludeGuid = new Dictionary<string, IsIncludeReturn>();
 			} else {
-				assetBundleGuid.Clear();
+				assetBundleIncludeGuid.Clear();
 			}
 			if (guidToPath == null) {
 				guidToPath = new Dictionary<string, string>();
@@ -1582,8 +1582,8 @@ namespace SearchTools {
 				//アセットバンドルと梱包アセットのリンク・逆リンク構築
 				var links = new Queue<AssetUniqueID>();
 				foreach (var dat in analyzeData) {
-					if (!assetBundleGuid.ContainsKey(dat.Key.guid)) {
-						assetBundleGuid[dat.Key.guid] = IsIncludeReturn.False;
+					if (!assetBundleIncludeGuid.ContainsKey(dat.Key.guid)) {
+						assetBundleIncludeGuid[dat.Key.guid] = IsIncludeReturn.False;
 					}
 					if (guidToAssetBundleAssetInfo.ContainsKey(dat.Key.guid)) {
 						var assetBundleUniqueID = guidToAssetBundleAssetInfo[dat.Key.guid];
@@ -1606,10 +1606,10 @@ namespace SearchTools {
 										links.Enqueue(nestlinkObject);
 									}
 								}
-								if (assetBundleGuid.ContainsKey(linkAssetUniqueID.guid)) {
-									assetBundleGuid[linkAssetUniqueID.guid] = IsIncludeReturn.True;
+								if (assetBundleIncludeGuid.ContainsKey(linkAssetUniqueID.guid)) {
+									assetBundleIncludeGuid[linkAssetUniqueID.guid] = IsIncludeReturn.True;
 								} else {
-									assetBundleGuid.Add(linkAssetUniqueID.guid, IsIncludeReturn.True);
+									assetBundleIncludeGuid.Add(linkAssetUniqueID.guid, IsIncludeReturn.True);
 								}
 							}
 						}
