@@ -33,7 +33,12 @@ namespace SearchTools {
 				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AmbiguousIcon.png"),
 			};
 			spritePackingTagIcon = EditorGUIUtility.FindTexture("PreTextureMipMapHigh");
-			assetBundleIcon = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AssetBundleIcon.png");
+			assetBundleIcons = new[]{
+				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AssetBundleExcludeIcon.png"),
+				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AssetBundleIncludeIcon.png"),
+				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AssetBundleUnknownIcon.png"),
+				AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SearchTools/Textures/AssetBundleAmbiguousIcon.png"),
+			};
 
 			StartAnalyze();
 		}
@@ -125,7 +130,7 @@ namespace SearchTools {
 		/// <summary>
 		/// アセットバンドル梱包アイコン
 		/// </summary>
-		private static Texture2D assetBundleIcon;
+		private static Texture2D[] assetBundleIcons;
 
 #if SEARCH_TOOLS_DEBUG
 		/// <summary>
@@ -278,8 +283,8 @@ namespace SearchTools {
 				//AssetBundle
 				var currentAssetBundle = LinkAnalyzer.ConvertUniqueIDToAssetBundle(uniqueID);
 				var label = currentAssetBundle + " (AssetBundle)";
-				var icon = assetBundleIcon;
-				var badgeIcons = new[]{null, assetBundleIcon};
+				var icon = assetBundleIcons[(int)LinkAnalyzer.IsIncludeReturn.True];
+				var badgeIcons = new[]{null, icon};
 				TreeItemField(position, label, icon, badgeIcons);
 			} else { 
 				//Object
@@ -340,7 +345,7 @@ namespace SearchTools {
 			var assetBundle = (linkAnalyzer.GetIncludeStateFlags(uniqueID) & LinkAnalyzer.IncludeStateFlags.AssetBundle) != 0;
 			if (assetBundle) {
 				position.x -= position.width;
-				GUI.DrawTexture(position, assetBundleIcon);
+				GUI.DrawTexture(position, assetBundleIcons[(int)LinkAnalyzer.IsIncludeReturn.True]);
 			}
 		}
 
@@ -397,11 +402,9 @@ namespace SearchTools {
 			var path = AssetDatabase.GUIDToAssetPath(guid);
 			var include = IsInclude(path);
 			GUI.DrawTexture(pos, includeIcons[(int)include]);
+			pos.x -= pos.width;
 			var assetBundleInclude = IsAssetBundleInclude(path);
-			if (assetBundleInclude == LinkAnalyzer.IsIncludeReturn.True) {
-				pos.x -= pos.width;
-				GUI.DrawTexture(pos, assetBundleIcon);
-			}
+			GUI.DrawTexture(pos, assetBundleIcons[(int)assetBundleInclude]);
 		}
 
 		/// <summary>

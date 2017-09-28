@@ -1582,9 +1582,6 @@ namespace SearchTools {
 				//アセットバンドルと梱包アセットのリンク・逆リンク構築
 				var links = new Queue<AssetUniqueID>();
 				foreach (var dat in analyzeData) {
-					if (!assetBundleIncludeGuid.ContainsKey(dat.Key.guid)) {
-						assetBundleIncludeGuid[dat.Key.guid] = IsIncludeReturn.False;
-					}
 					if (guidToAssetBundleAssetInfo.ContainsKey(dat.Key.guid)) {
 						var assetBundleUniqueID = guidToAssetBundleAssetInfo[dat.Key.guid];
 						var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
@@ -1594,6 +1591,7 @@ namespace SearchTools {
 							assetInfo.inboundLinks = new List<AssetUniqueID>();
 						}
 						assetInfo.inboundLinks.Add(assetBundleUniqueID);
+						assetBundleIncludeGuid[dat.Key.guid] = IsIncludeReturn.True;
 
 						links.Enqueue(dat.Key);
 						while (0 < links.Count) {
@@ -1606,12 +1604,14 @@ namespace SearchTools {
 										links.Enqueue(nestlinkObject);
 									}
 								}
-								if (assetBundleIncludeGuid.ContainsKey(linkAssetUniqueID.guid)) {
-									assetBundleIncludeGuid[linkAssetUniqueID.guid] = IsIncludeReturn.True;
-								} else {
-									assetBundleIncludeGuid.Add(linkAssetUniqueID.guid, IsIncludeReturn.True);
+								if (!assetBundleIncludeGuid.ContainsKey(linkAssetUniqueID.guid) || (assetBundleIncludeGuid[linkAssetUniqueID.guid] != IsIncludeReturn.True)) {
+									assetBundleIncludeGuid[linkAssetUniqueID.guid] = IsIncludeReturn.Ambiguous;
 								}
 							}
+						}
+					} else {
+						if (!assetBundleIncludeGuid.ContainsKey(dat.Key.guid)) {
+							assetBundleIncludeGuid.Add(dat.Key.guid, IsIncludeReturn.False);
 						}
 					}
 					IncrementAnalyzeProgress();
