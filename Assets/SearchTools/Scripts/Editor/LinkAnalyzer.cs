@@ -1546,7 +1546,7 @@ namespace SearchTools {
 			if (0 == assetPathsFromAssetBundle.Count) {
 				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, 0);
 			} else {
-				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, assetPathsFromAssetBundle.Count * 2 + analyzeData.Count);
+				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, assetPathsFromAssetBundle.Count * 3 + analyzeData.Count);
 
 				//アセットバンドルの解析ノード登録と梱包アセットパスの逆引き辞書構築
 				var guidToAssetBundleAssetInfo = new Dictionary<string, AssetUniqueID>();
@@ -1621,7 +1621,7 @@ namespace SearchTools {
 					var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
 					var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
 					assetBundleAssetInfo.links.Sort(linksSortComparison);
-//					IncrementAnalyzeProgress();
+					IncrementAnalyzeProgress();
 				}
 			}
 		}
