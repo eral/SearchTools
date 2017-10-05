@@ -76,19 +76,20 @@ namespace SearchTools {
 		[System.Flags]
 		public enum IncludeStateFlags { 
 			NonInclude				= 1<<0,
-			Link					= 1<<1,
-			Scripts					= 1<<2,
-			Resources				= 1<<3,
-			StreamingAssets			= 1<<4,
-			ScenesInBuild			= 1<<5,
-			AlwaysIncludedShaders	= 1<<6,
+			AssetBundle				= 1<<1,
+			Link					= 1<<2,
+			Scripts					= 1<<3,
+			Resources				= 1<<4,
+			StreamingAssets			= 1<<5,
+			ScenesInBuild			= 1<<6,
+			AlwaysIncludedShaders	= 1<<7,
 		}
 
 		/// <summary>
 		/// 解析中確認
 		/// </summary>
 		public  bool analyzing {get{
-			return analyzeThread != null;
+			return (analyzeOnMainThreadUpdate != null) || (analyzeThread != null);
 		}}
 
 		/// <summary>
@@ -102,10 +103,14 @@ namespace SearchTools {
 		/// IDisposableインターフェース
 		/// </summary>
 		public void Dispose() {
+			if(analyzeOnMainThreadUpdate != null) {
+				analyzeOnMainThreadUpdate = null;
+			}
 			if(analyzeThread != null) {
 #if !SEARCH_TOOLS_DEBUG
 				analyzeThread.Abort();
 #endif
+				analyzeThread = null;
 			}
 		}
 
@@ -183,22 +188,27 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// アセットバンドルユニークID確認
+		/// </summary>
+		public static bool IsAssetBundle(AssetUniqueID uniqueID) {
+			var result = false;
+			if (!string.IsNullOrEmpty(uniqueID.guid)) {
+				result = uniqueID.guid.StartsWith(assetBundlesPrefix);
+				result = result && (uniqueID.fileID == 0);
+			}
+			return result;
+		}
+
+		/// <summary>
 		/// ユニークIDの梱包確認
 		/// </summary>
 		public IsIncludeReturn IsInclude(AssetUniqueID uniqueID) {
 			var result = IsIncludeReturn.Unknown;
 			if (analyzeData.ContainsKey(uniqueID)) {
 				var state = analyzeData[uniqueID].state;
-				switch (state) { 
-				case 0:
-					//empty.
-					break;
-				case IncludeStateFlags.NonInclude:
-					result = IsIncludeReturn.False;
-					break;
-				default:
-					result = IsIncludeReturn.True;
-					break;
+				if (state != 0) {
+					state &= ~(IncludeStateFlags.NonInclude | IncludeStateFlags.AssetBundle);
+					result = (((state != 0))? IsIncludeReturn.True: IsIncludeReturn.False);
 				}
 			}
 			return result;
@@ -213,6 +223,20 @@ namespace SearchTools {
 				var guid = pathToGuid[path];
 				if (includeGuid.ContainsKey(guid)) {
 					result = includeGuid[guid];
+				}
+			}
+			return result;
+		}
+
+		/// <summary>
+		/// パスのアセットバンドル梱包確認
+		/// </summary>
+		public IsIncludeReturn IsAssetBundleIncludeFromPath(string path) {
+			var result = IsIncludeReturn.Unknown;
+			if (pathToGuid.ContainsKey(path)) {
+				var guid = pathToGuid[path];
+				if (assetBundleIncludeGuid.ContainsKey(guid)) {
+					result = assetBundleIncludeGuid[guid];
 				}
 			}
 			return result;
@@ -281,7 +305,7 @@ namespace SearchTools {
 		/// </summary>
 		public List<AssetUniqueID> GetInboundLinks(AssetUniqueID uniqueID) {
 			List<AssetUniqueID> result = null;
-			if (!analyzing && analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
+			if (analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
 				result = analyzeData[uniqueID].inboundLinks;
 			} else if (uniqueID.fileID != 0) {
 				uniqueID.fileID = 0;
@@ -308,7 +332,7 @@ namespace SearchTools {
 		/// </summary>
 		public string GetSpritePackingTag(AssetUniqueID uniqueID) {
 			string result = null;
-			if (!analyzing && analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
+			if (analyzeData.ContainsKey(uniqueID) && (analyzeData[uniqueID].state != 0)) {
 				result = analyzeData[uniqueID].spritePackingTag;
 			} else if (uniqueID.fileID != 0) {
 				uniqueID.fileID = 0;
@@ -343,41 +367,29 @@ namespace SearchTools {
 		}
 
 		/// <summary>
+		/// AssetBundleをユニークIDに変換
+		/// </summary>
+		public static AssetUniqueID ConvertAssetBundleToUniqueID(string assetBundle) {
+			return new AssetUniqueID(assetBundlesPrefix + assetBundle, 0);
+		}
+
+		/// <summary>
+		/// ユニークIDをAssetBundleに変換
+		/// </summary>
+		public static string ConvertUniqueIDToAssetBundle(AssetUniqueID uniqueID) {
+			string result = null;
+			if (IsAssetBundle(uniqueID)) { 
+				result = uniqueID.guid.Substring(assetBundlesPrefix.Length);
+			}
+			return result;
+		}
+
+		/// <summary>
 		/// 開始
 		/// </summary>
 		public void Start() {
 			if (analyzeProgress == 0.0f) {
-				var allAssetPaths = AssetDatabase.GetAllAssetPaths();
-
-				includeScenePaths = EditorBuildSettings.scenes.Where(x=>x.enabled)
-														.Select(x=>x.path)
-														.ToArray();
-				if (includeScenePaths.Length == 0) {
-					var activeScenePath = EditorSceneManager.GetActiveScene().path;
-					if (!string.IsNullOrEmpty(activeScenePath)) {
-						includeScenePaths = new[]{activeScenePath};
-					}
-				}
-
-				analyzeData = new Dictionary<AssetUniqueID, AssetInfo>(allAssetPaths.Length);
-				includeGuid = new Dictionary<string, IsIncludeReturn>(allAssetPaths.Length);
-				guidToPath = new Dictionary<string, string>(allAssetPaths.Length);
-				pathToGuid = new Dictionary<string, string>(allAssetPaths.Length);
-				foreach (var path in allAssetPaths) {
-					if (path.StartsWith(assetsPrefix)) {
-						var guid = AssetDatabase.AssetPathToGUID(path);
-						guidToPath.Add(guid, path);
-						pathToGuid.Add(path, guid);
-			}
-		}
-
-#if SEARCH_TOOLS_DEBUG
-				analyzeThread = 0;
-				Analyze();
-#else
-				analyzeThread = new Thread(Analyze);
-				analyzeThread.Start();
-#endif
+				AnalyzeStart();
 			}
 		}
 
@@ -385,14 +397,28 @@ namespace SearchTools {
 		/// リフレッシュ
 		/// </summary>
 		public void Refresh() {
+			if(analyzeOnMainThreadUpdate != null) {
+				analyzeOnMainThreadUpdate = null;
+			}
 			if(analyzeThread != null) {
 #if !SEARCH_TOOLS_DEBUG
 				analyzeThread.Abort();
 #endif
+				analyzeThread = null;
 			}
 			analyzeProgress = 0.0f;
 			Start();
 		}
+
+		/// <summary>
+		/// メインスレッド解析のフレーム毎稼動上限秒
+		/// </summary>
+		private const float mainThreadUpdateTimeLimitSecond = 0.016f;
+
+		/// <summary>
+		/// メインスレッド解析用コルーチン
+		/// </summary>
+		private IEnumerator<object> analyzeOnMainThreadUpdate;
 
 		/// <summary>
 		/// 解析スレッド
@@ -404,9 +430,54 @@ namespace SearchTools {
 #endif
 
 		/// <summary>
+		/// 解析進捗の区切り(～GUID辞書生成)
+		/// </summary>
+		private const float analyzeProgressAnalyzeOnMainThreadGuids = 0.01f;
+
+		/// <summary>
+		/// 解析進捗の区切り(～リンク構築)
+		/// </summary>
+		private const float analyzeProgressAnalyzeMain = 0.94f;
+
+		/// <summary>
+		/// 解析進捗の区切り(～FileID正規化)
+		/// </summary>
+		private const float analyzeProgressFileIDNormalize = 0.95f;
+
+		/// <summary>
+		/// 解析進捗の区切り(～逆リンク構築)
+		/// </summary>
+		private const float analyzeProgressInboundLink = 1.00f;
+
+		/// <summary>
+		/// 解析進捗の区切り(～アセットバンドルラベル辞書生成)
+		/// </summary>
+		private const float analyzeProgressAnalyzeOnMainThreadAssetBundles = 0.90f;
+
+		/// <summary>
+		/// 解析進捗の区切り(～アセットバンドルフラグ付与)
+		/// </summary>
+		private const float analyzeProgressAddAssetBundleFlag = 1.00f;
+
+		/// <summary>
 		/// 解析進捗
 		/// </summary>
 		private float analyzeProgress = 0.0f;
+
+		/// <summary>
+		/// 解析進捗範囲
+		/// </summary>
+		private Vector2 analyzeProgressRange = new Vector2(0.0f, 1.0f);
+
+		/// <summary>
+		/// 解析進捗カウント
+		/// </summary>
+		private float analyzeProgressDelta = 0.0f;
+
+		/// <summary>
+		/// 解析進捗カウント
+		/// </summary>
+		private float analyzeProgressCount = 0.0f;
 
 		/// <summary>
 		/// 解析パス
@@ -484,6 +555,11 @@ namespace SearchTools {
 		private const string spritePackingTagsPrefix = "SpritePackingTags/";
 
 		/// <summary>
+		/// AssetBundleパスのプレフィックス
+		/// </summary>
+		private const string assetBundlesPrefix = "AssetBundles/";
+
+		/// <summary>
 		/// 解析結果
 		/// </summary>
 		private Dictionary<AssetUniqueID, AssetInfo> analyzeData = null;
@@ -492,6 +568,11 @@ namespace SearchTools {
 		/// GUIDパス梱包結果
 		/// </summary>
 		private Dictionary<string, IsIncludeReturn> includeGuid = null;
+
+		/// <summary>
+		/// GUIDアセットバンドル梱包結果
+		/// </summary>
+		private Dictionary<string, IsIncludeReturn> assetBundleIncludeGuid = null;
 
 		/// <summary>
 		/// 梱包シーンパス
@@ -509,26 +590,220 @@ namespace SearchTools {
 		private Dictionary<string, string> pathToGuid = null;
 
 		/// <summary>
+		/// アセットバンドル梱包バス辞書
+		/// </summary>
+		private Dictionary<string, string[]> assetPathsFromAssetBundle = null;
+
+		/// <summary>
+		/// アセットバンドルリンク辞書
+		/// </summary>
+		private Dictionary<string, string[]> assetBundleLinks = null;
+
+		/// <summary>
+		/// 解析進捗設定
+		/// </summary>
+		private void ResetAnalyzeProgress() {
+			analyzeProgress = 0.0f;
+			analyzeProgressRange = Vector2.zero;
+			analyzeProgressDelta = 0.0f;
+			analyzeProgressCount = 0.0f;
+		}
+
+		/// <summary>
+		/// 解析進捗範囲設定
+		/// </summary>
+		private void SetAnalyzeProgressRange(float max, int count) {
+			analyzeProgressRange.x = analyzeProgressRange.y;
+			analyzeProgressRange.y = max;
+			if (analyzeProgress < analyzeProgressRange.x) {
+				analyzeProgress = analyzeProgressRange.x;
+			}
+			if (0 < count) {
+				analyzeProgressDelta = 1.0f / count;
+			} else {
+				analyzeProgressDelta = 0.0f;
+				analyzeProgress = analyzeProgressRange.y;
+			}
+			analyzeProgressCount = 0.0f;
+		}
+
+		/// <summary>
+		/// 解析進捗設定
+		/// </summary>
+		private void IncrementAnalyzeProgress() {
+			analyzeProgress = Mathf.Lerp(analyzeProgressRange.x, analyzeProgressRange.y, ++analyzeProgressCount * analyzeProgressDelta);
+		}
+
+		/// <summary>
 		/// 解析開始
 		/// </summary>
-		private void Analyze() {
-			//スクリプト梱包判定
-			var scriptsCount = AnalyzeForScriptsAndStreamingAssets();
+		private void AnalyzeStart() {
+			ResetAnalyzeProgress();
 
-			var progressUnit = 1.0f / (pathToGuid.Count - scriptsCount + 2);
-			var doneCount = 0.0f;
+			includeScenePaths = null;
+			if (analyzeData == null) {
+				analyzeData = new Dictionary<AssetUniqueID, AssetInfo>();
+			} else {
+				analyzeData.Clear();
+			}
+			if (includeGuid == null) {
+				includeGuid = new Dictionary<string, IsIncludeReturn>();
+			} else {
+				includeGuid.Clear();
+			}
+			if (assetBundleIncludeGuid == null) {
+				assetBundleIncludeGuid = new Dictionary<string, IsIncludeReturn>();
+			} else {
+				assetBundleIncludeGuid.Clear();
+			}
+			if (guidToPath == null) {
+				guidToPath = new Dictionary<string, string>();
+			} else {
+				guidToPath.Clear();
+			}
+			if (pathToGuid == null) {
+				pathToGuid = new Dictionary<string, string>();
+			} else {
+				pathToGuid.Clear();
+			}
+
+			if (assetPathsFromAssetBundle == null) {
+				assetPathsFromAssetBundle = new Dictionary<string, string[]>();
+			} else {
+				assetPathsFromAssetBundle.Clear();
+			}
+			if (assetBundleLinks == null) {
+				assetBundleLinks = new Dictionary<string, string[]>();
+			} else {
+				assetBundleLinks.Clear();
+			}
+
+			analyzeOnMainThreadUpdate = AnalyzeOnMainThread();
+			EditorApplication.update += AnalyzeOnMainThreadUpdate;
+		}
+
+		/// <summary>
+		/// メインスレッド解析用更新
+		/// </summary>
+		private void AnalyzeOnMainThreadUpdate() {
+			var startTime = Time.realtimeSinceStartup;
+
+			do {
+				if (analyzeOnMainThreadUpdate == null) {
+					EditorApplication.update -= AnalyzeOnMainThreadUpdate;
+					break;
+				} else if (!analyzeOnMainThreadUpdate.MoveNext()) {
+					analyzeOnMainThreadUpdate = null;
+					EditorApplication.update -= AnalyzeOnMainThreadUpdate;
+					break;
+				}
+			} while ((Time.realtimeSinceStartup - startTime) < mainThreadUpdateTimeLimitSecond);
+		}
+
+		/// <summary>
+		/// メインスレッド解析
+		/// </summary>
+		private IEnumerator<object> AnalyzeOnMainThread() {
+			SetAnalyzeProgressRange(float.Epsilon, 0);
+
+			var allAssetPaths = AssetDatabase.GetAllAssetPaths();
+			yield return null;
+
+			includeScenePaths = EditorBuildSettings.scenes.Where(x=>x.enabled)
+													.Select(x=>x.path)
+													.ToArray();
+			if (includeScenePaths.Length == 0) {
+				yield return null;
+				var activeScenePath = EditorSceneManager.GetActiveScene().path;
+				if (!string.IsNullOrEmpty(activeScenePath)) {
+					includeScenePaths = new[]{activeScenePath};
+				}
+			}
+			yield return null;
+
+			SetAnalyzeProgressRange(analyzeProgressAnalyzeOnMainThreadGuids, allAssetPaths.Length);
+			foreach (var path in allAssetPaths) {
+				if (path.StartsWith(assetsPrefix)) {
+					var guid = AssetDatabase.AssetPathToGUID(path);
+					guidToPath.Add(guid, path);
+					pathToGuid.Add(path, guid);
+
+					yield return null;
+				}
+				IncrementAnalyzeProgress();
+			}
+
+#if SEARCH_TOOLS_DEBUG
+			analyzeThread = 0;
+			EditorApplication.delayCall += Analyze;
+#else
+			analyzeThread = new Thread(Analyze);
+			analyzeThread.Start();
+#endif
+
+			yield break;
+		}
+
+		/// <summary>
+		/// 解析
+		/// </summary>
+		private void Analyze() {
+			SetAnalyzeProgressRange(analyzeProgressAnalyzeMain, pathToGuid.Count);
+
+			//スクリプト梱包判定
+			AnalyzeForScriptsAndStreamingAssets();
 
 			//アセット梱包判定
-			AnalyzeForAsset(ref doneCount, progressUnit);
+			AnalyzeForAsset();
 
 			//残りを除外判定
-			ExcludeForLeftovers(ref doneCount, progressUnit);
+			ExcludeForLeftovers();
 
 			//fileIDの正規化
-			FileIDNormalize(ref doneCount, progressUnit);
+			FileIDNormalize();
 
 			//逆リンク判定
-			AnalyzeForInboundLink(ref doneCount, progressUnit);
+			AnalyzeForInboundLink();
+
+			analyzeOnMainThreadUpdate = AnalyzeAssetBundleOnMainThread();
+			EditorApplication.update += AnalyzeOnMainThreadUpdate;
+			analyzeThread = null;
+		}
+
+
+		/// <summary>
+		/// メインスレッドアセットバンドル解析
+		/// </summary>
+		private IEnumerator<object> AnalyzeAssetBundleOnMainThread() {
+			var allAssetBundleNames = AssetDatabase.GetAllAssetBundleNames();
+			if (0 < allAssetBundleNames.Length) {
+				ResetAnalyzeProgress();
+				SetAnalyzeProgressRange(analyzeProgressAnalyzeOnMainThreadAssetBundles, allAssetBundleNames.Length);
+
+				foreach (var assetBundleName in allAssetBundleNames) {
+					assetPathsFromAssetBundle.Add(assetBundleName, AssetDatabase.GetAssetPathsFromAssetBundle(assetBundleName));
+					assetBundleLinks.Add(assetBundleName, AssetDatabase.GetAssetBundleDependencies(assetBundleName, false));
+					IncrementAnalyzeProgress();
+					yield return null;
+				}
+
+#if SEARCH_TOOLS_DEBUG
+				analyzeThread = 0;
+				EditorApplication.delayCall += AnalyzeAssetBundle;
+#else
+				analyzeThread = new Thread(AnalyzeAssetBundle);
+				analyzeThread.Start();
+#endif
+			}
+			yield break;
+		}
+
+		/// <summary>
+		/// アセットバンドル解析
+		/// </summary>
+		private void AnalyzeAssetBundle() {
+			//アセットバンドル属性付与
+			AddAssetBundleFlag();
 
 			analyzeThread = null;
 		}
@@ -536,8 +811,7 @@ namespace SearchTools {
 		/// <summary>
 		/// スクリプトとStreamingAssetsの梱包判定
 		/// </summary>
-		private int AnalyzeForScriptsAndStreamingAssets() {
-			var result = 0;
+		private void AnalyzeForScriptsAndStreamingAssets() {
 			foreach (var ptg in pathToGuid) {
 				var path = ptg.Key;
 
@@ -558,7 +832,7 @@ namespace SearchTools {
 						}
 
 						includeGuid.Add(guid,  ConvertIncludeStateFlagsToIsIncludeReturn(dat.state));
-						++result;
+						IncrementAnalyzeProgress();
 					}
 					break;
 				default:
@@ -569,19 +843,18 @@ namespace SearchTools {
 							analyzeData.Add(new AssetUniqueID(guid), dat);
 
 							includeGuid.Add(guid,  ConvertIncludeStateFlagsToIsIncludeReturn(dat.state));
-							++result;
+							IncrementAnalyzeProgress();
 						}
 					}
 					break;
 				}
 			}
-			return result;
 		}
 
 		/// <summary>
 		/// アセット梱包判定
 		/// </summary>
-		private void AnalyzeForAsset(ref float doneCount, float progressUnit) {
+		private void AnalyzeForAsset() {
 			var analyzeQueue = new Queue<AssetUniqueID>();
 
 			//信頼されたルートの検索
@@ -670,8 +943,7 @@ namespace SearchTools {
 						includeGuid[analyzeUniqueID.guid] = IsIncludeReturn.True;
 					}
 
-					++doneCount;
-					analyzeProgress = doneCount * progressUnit;
+					IncrementAnalyzeProgress();
 				} else if (analyzeData[analyzeUniqueID].state == IncludeStateFlags.NonInclude) {
 					analyzeData[analyzeUniqueID].state = IncludeStateFlags.Link;
 					if (analyzeData[analyzeUniqueID].links != null) {
@@ -1142,7 +1414,7 @@ namespace SearchTools {
 		/// <summary>
 		/// 残りを除外判定
 		/// </summary>
-		private void ExcludeForLeftovers(ref float doneCount, float progressUnit) {
+		private void ExcludeForLeftovers() {
 			foreach(var analyzePath in pathToGuid.Keys) {
 				var analyzeUniqueID = new AssetUniqueID(pathToGuid[analyzePath]);
 
@@ -1178,8 +1450,7 @@ namespace SearchTools {
 					}
 					includeGuid.Add(analyzeUniqueID.guid, includeGuidState);
 
-					++doneCount;
-					analyzeProgress = doneCount * progressUnit;
+					IncrementAnalyzeProgress();
 				}
 			}
 		}
@@ -1187,7 +1458,9 @@ namespace SearchTools {
 		/// <summary>
 		/// fileIDの正規化
 		/// </summary>
-		private void FileIDNormalize(ref float doneCount, float progressUnit) {
+		private void FileIDNormalize() {
+			SetAnalyzeProgressRange(analyzeProgressFileIDNormalize, analyzeData.Count);
+
 			foreach(var dat in analyzeData) {
 				var assetInfo = dat.Value;
 				if (assetInfo.links != null) {
@@ -1213,26 +1486,22 @@ namespace SearchTools {
 							}
 						}
 					}
-					links.Sort((x,y)=>{
-						var compare = string.Compare(guidToPath[x.guid], guidToPath[y.guid]);
-						if (compare == 0) {
-							compare = x.fileID - y.fileID;
-						}
-						return compare;
-					});
+					links.Sort(linksSortComparison);
 				}
-			}
 
-			++doneCount;
-			analyzeProgress = doneCount * progressUnit;
+				IncrementAnalyzeProgress();
+			}
 		}
 
 		/// <summary>
 		/// 逆リンク判定
 		/// </summary>
-		private void AnalyzeForInboundLink(ref float doneCount, float progressUnit) {
+		private void AnalyzeForInboundLink() {
+			SetAnalyzeProgressRange(analyzeProgressInboundLink, analyzeData.Count * 2);
+
 			foreach(var dat in analyzeData) {
 				if (IsSpritePackingTag(dat.Key)) {
+					IncrementAnalyzeProgress();
 					continue;
 				}
 				if (dat.Value.links != null) {
@@ -1260,21 +1529,119 @@ namespace SearchTools {
 						}
 					}
 				}
+				IncrementAnalyzeProgress();
 			}
 			foreach(var assetInfo in analyzeData.Values) {
 				if (assetInfo.inboundLinks != null) {
-					assetInfo.inboundLinks.Sort((x,y)=>{
-						var compare = string.Compare(guidToPath[x.guid], guidToPath[y.guid]);
-						if (compare == 0) {
-							compare = x.fileID - y.fileID;
+					assetInfo.inboundLinks.Sort(linksSortComparison);
+				}
+				IncrementAnalyzeProgress();
+			}
+		}
+
+		/// <summary>
+		/// アセットバンドル属性付与
+		/// </summary>
+		private void AddAssetBundleFlag() {
+			if (0 == assetPathsFromAssetBundle.Count) {
+				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, 0);
+			} else {
+				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, assetPathsFromAssetBundle.Count * 3 + analyzeData.Count);
+
+				//アセットバンドルの解析ノード登録と梱包アセットパスの逆引き辞書構築
+				var guidToAssetBundleAssetInfo = new Dictionary<string, AssetUniqueID>();
+				foreach(var assetBundle in assetPathsFromAssetBundle) {
+					var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
+					var assetBundleAssetInfo = new AssetInfo(IncludeStateFlags.AssetBundle, new List<AssetUniqueID>(), null);
+					analyzeData.Add(assetBundleUniqueID, assetBundleAssetInfo);
+
+					foreach(var path in assetBundle.Value) {
+						if (pathToGuid.ContainsKey(path)) {
+							var guid = pathToGuid[path];
+							guidToAssetBundleAssetInfo.Add(guid, assetBundleUniqueID);
 						}
-						return compare;
-					});
+					}
+					IncrementAnalyzeProgress();
+				}
+				//アセットバンドル間のリンク・逆リンク構築
+				foreach(var assetBundle in assetPathsFromAssetBundle) {
+					var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
+					var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
+					foreach(var link in assetBundleLinks[assetBundle.Key]) {
+						var linkAssetBundleUniqueID = ConvertAssetBundleToUniqueID(link);
+						assetBundleAssetInfo.links.Add(linkAssetBundleUniqueID);
+
+						var linkAssetInfo = analyzeData[linkAssetBundleUniqueID];
+						if (linkAssetInfo.inboundLinks == null) {
+							linkAssetInfo.inboundLinks = new List<AssetUniqueID>();
+						}
+						linkAssetInfo.inboundLinks.Add(assetBundleUniqueID);
+					}
+					IncrementAnalyzeProgress();
+				}
+				//アセットバンドルと梱包アセットのリンク・逆リンク構築
+				var links = new Queue<AssetUniqueID>();
+				foreach (var dat in analyzeData) {
+					if (guidToAssetBundleAssetInfo.ContainsKey(dat.Key.guid)) {
+						var assetBundleUniqueID = guidToAssetBundleAssetInfo[dat.Key.guid];
+						var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
+						assetBundleAssetInfo.links.Add(dat.Key);
+						var assetInfo = analyzeData[dat.Key];
+						if (assetInfo.inboundLinks == null) {
+							assetInfo.inboundLinks = new List<AssetUniqueID>();
+						}
+						assetInfo.inboundLinks.Add(assetBundleUniqueID);
+						assetBundleIncludeGuid[dat.Key.guid] = IsIncludeReturn.True;
+
+						links.Enqueue(dat.Key);
+						while (0 < links.Count) {
+							var linkAssetUniqueID = links.Dequeue();
+							var linkObject = analyzeData[linkAssetUniqueID];
+							if ((linkObject.state & IncludeStateFlags.AssetBundle) == 0) {
+								linkObject.state |= IncludeStateFlags.AssetBundle;
+								if (linkObject.links != null) {
+									foreach (var nestlinkObject in linkObject.links) {
+										links.Enqueue(nestlinkObject);
+									}
+								}
+								if (!assetBundleIncludeGuid.ContainsKey(linkAssetUniqueID.guid) || (assetBundleIncludeGuid[linkAssetUniqueID.guid] != IsIncludeReturn.True)) {
+									assetBundleIncludeGuid[linkAssetUniqueID.guid] = IsIncludeReturn.Ambiguous;
+								}
+							}
+						}
+					} else {
+						if (!assetBundleIncludeGuid.ContainsKey(dat.Key.guid)) {
+							assetBundleIncludeGuid.Add(dat.Key.guid, IsIncludeReturn.False);
+						}
+					}
+					IncrementAnalyzeProgress();
+				}
+				//アセットバンドルのリンク・逆リンクをソート
+				foreach(var assetBundle in assetPathsFromAssetBundle) {
+					var assetBundleUniqueID = ConvertAssetBundleToUniqueID(assetBundle.Key);
+					var assetBundleAssetInfo = analyzeData[assetBundleUniqueID];
+					assetBundleAssetInfo.links.Sort(linksSortComparison);
+					IncrementAnalyzeProgress();
 				}
 			}
+		}
 
-			++doneCount;
-			analyzeProgress = doneCount * progressUnit;
+		/// <summary>
+		/// リンク・逆リンクのソート
+		/// </summary>
+		private int linksSortComparison(AssetUniqueID x, AssetUniqueID y) {
+			int result;
+			if (!guidToPath.ContainsKey(y.guid)) {
+				result = -1;
+			} else if (!guidToPath.ContainsKey(x.guid)) {
+				result = 1;
+			} else {
+				result = string.Compare(guidToPath[x.guid], guidToPath[y.guid]);
+				if (result == 0) {
+					result = x.fileID - y.fileID;
+				}
+			}
+			return result;
 		}
 	}
 }
