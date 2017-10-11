@@ -15,5 +15,10 @@ Unityに於ける各種検索機能の実装
 <img alt="AmbiguousIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/AmbiguousIcon.png">…ロムに含まれるアセットと含まれないアセットが混在している(Projectタブのみ)  
 <img alt="UnknownIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/UnknownIcon.png">…判定対象になっていない(解析時に存在しなかったアセット)  
 
+<img alt="AssetBundleIncludeIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/AssetBundleIncludeIcon.png">…アセットバンドルに含まれる  
+<img alt="AssetBundleExcludeIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/AssetBundleExcludeIcon.png">…アセットバンドルに含まれない  
+<img alt="AssetBundleAmbiguousIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/AssetBundleAmbiguousIcon.png">…アセットバンドルに含まれるアセットと含まれないアセットが混在している(Projectタブのみ)  
+<img alt="AssetBundleUnknownIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/AssetBundleUnknownIcon.png">…判定対象になっていない(解析時に存在しなかったアセット)  
+
 ## LICENSE
 Boost Software License, Version 1.0
