@@ -12,7 +12,7 @@ Unityに於ける各種検索機能の実装
 ## アイコンの意味
 <img alt="IncludeIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/IncludeIcon.png">…ロムに含まれる  
 <img alt="ExcludeIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/ExcludeIcon.png">…ロムに含まれない  
-<img alt="Ambiguous" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/AmbiguousIcon.png">…ロムに含まれるアセットと含まれないアセットが混ざってる(Projectタブのみ)  
+<img alt="AmbiguousIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/AmbiguousIcon.png">…ロムに含まれるアセットと含まれないアセットが混在している(Projectタブのみ)  
 <img alt="UnknownIcon" src="https://raw.githubusercontent.com/eral/SearchTools/master/Assets/SearchTools/Textures/UnknownIcon.png">…判定対象になっていない(解析時に存在しなかったアセット)  
 
 ## LICENSE
