@@ -776,25 +776,22 @@ namespace SearchTools {
 		/// </summary>
 		private IEnumerator<object> AnalyzeAssetBundleOnMainThread() {
 			var allAssetBundleNames = AssetDatabase.GetAllAssetBundleNames();
-			if (0 < allAssetBundleNames.Length) {
-				ResetAnalyzeProgress();
-				SetAnalyzeProgressRange(analyzeProgressAnalyzeOnMainThreadAssetBundles, allAssetBundleNames.Length);
-
-				foreach (var assetBundleName in allAssetBundleNames) {
-					assetPathsFromAssetBundle.Add(assetBundleName, AssetDatabase.GetAssetPathsFromAssetBundle(assetBundleName));
-					assetBundleLinks.Add(assetBundleName, AssetDatabase.GetAssetBundleDependencies(assetBundleName, false));
-					IncrementAnalyzeProgress();
-					yield return null;
-				}
+			ResetAnalyzeProgress();
+			SetAnalyzeProgressRange(analyzeProgressAnalyzeOnMainThreadAssetBundles, allAssetBundleNames.Length);
+			foreach (var assetBundleName in allAssetBundleNames) {
+				assetPathsFromAssetBundle.Add(assetBundleName, AssetDatabase.GetAssetPathsFromAssetBundle(assetBundleName));
+				assetBundleLinks.Add(assetBundleName, AssetDatabase.GetAssetBundleDependencies(assetBundleName, false));
+				IncrementAnalyzeProgress();
+				yield return null;
+			}
 
 #if SEARCH_TOOLS_DEBUG
-				analyzeThread = 0;
-				EditorApplication.delayCall += AnalyzeAssetBundle;
+			analyzeThread = 0;
+			EditorApplication.delayCall += AnalyzeAssetBundle;
 #else
-				analyzeThread = new Thread(AnalyzeAssetBundle);
-				analyzeThread.Start();
+			analyzeThread = new Thread(AnalyzeAssetBundle);
+			analyzeThread.Start();
 #endif
-			}
 			yield break;
 		}
 
@@ -1545,6 +1542,10 @@ namespace SearchTools {
 		private void AddAssetBundleFlag() {
 			if (0 == assetPathsFromAssetBundle.Count) {
 				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, 0);
+				foreach (var path in pathToGuid.Keys) {
+					var guid = pathToGuid[path];
+					assetBundleIncludeGuid[guid] = IsIncludeReturn.False;
+				}
 			} else {
 				SetAnalyzeProgressRange(analyzeProgressAddAssetBundleFlag, assetPathsFromAssetBundle.Count * 3 + analyzeData.Count);
 
