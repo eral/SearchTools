@@ -114,7 +114,24 @@ namespace SearchTools {
 		/// <summary>
 		/// 解析器
 		/// </summary>
-		private LinkAnalyzer linkAnalyzer {get{return linkAnalyzerField ?? (linkAnalyzerField = new LinkAnalyzer());}}
+		private LinkAnalyzer linkAnalyzer
+		{
+			get
+			{
+				if (linkAnalyzerField == null)
+				{
+					if (ScriptableSingleton<LinkAnalyzer>.instance != null)
+					{
+						linkAnalyzerField = ScriptableSingleton<LinkAnalyzer>.instance;
+					}
+					else
+					{
+						linkAnalyzerField = CreateInstance<LinkAnalyzer>();
+					}
+				}
+				return linkAnalyzerField;
+			}
+		}
 		private LinkAnalyzer linkAnalyzerField = null;
 
 		/// <summary>
@@ -250,7 +267,7 @@ namespace SearchTools {
 
 			var currentFoldoutUniqueID = parentFoldoutUniqueID + "/" + uniqueID;
 			if (!linkViewStates[(int)analyzeMode].Foldouts.ContainsKey(currentFoldoutUniqueID)) {
-				linkViewStates[(int)analyzeMode].Foldouts.Add(currentFoldoutUniqueID, false);
+				linkViewStates[(int)analyzeMode].Foldouts.Add(currentFoldoutUniqueID, true);
 			}
 			var foldout = linkViewStates[(int)analyzeMode].Foldouts[currentFoldoutUniqueID];
 
@@ -387,7 +404,8 @@ namespace SearchTools {
 		/// </summary>
 		/// <param name="guid">GUID</param>
 		/// <param name="selectionRect">選択矩形</param>
-		private void ProjectWindowItemOnGUI(string guid, Rect selectionRect) {
+		private void ProjectWindowItemOnGUI(string guid, Rect selectionRect)
+		{
 			var pos = selectionRect;
 			if (listItemHeightInProjectWindow < pos.height) {
 				//アイコン
@@ -401,10 +419,14 @@ namespace SearchTools {
 			}
 			var path = AssetDatabase.GUIDToAssetPath(guid);
 			var include = IsInclude(path);
-			GUI.DrawTexture(pos, includeIcons[(int)include]);
+			//higuchi ProjectWindowへのアイコン描画は行わない
+			//GUI.DrawTexture(pos, includeIcons[(int)include]);
+			//end higuchi
 			pos.x -= pos.width;
 			var assetBundleInclude = IsAssetBundleInclude(path);
-			GUI.DrawTexture(pos, assetBundleIcons[(int)assetBundleInclude]);
+			//higuchi ProjectWindowへのアイコン描画は行わない
+			//GUI.DrawTexture(pos, assetBundleIcons[(int)assetBundleInclude]);
+			//end higuchi
 		}
 
 		/// <summary>
@@ -450,7 +472,8 @@ namespace SearchTools {
 		/// </summary>
 		private void QuitAnalyze() {
 			EditorApplication.update -= AnalyzingUpdate;
-			linkAnalyzer.Dispose();
+			//ウィンドウを閉じても解析は終わらせない
+			//linkAnalyzer.Dispose();
 		}
 
 		/// <summary>

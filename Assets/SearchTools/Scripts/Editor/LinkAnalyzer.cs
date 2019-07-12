@@ -11,10 +11,12 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Text;
+using SerializableCollections;
 
 namespace SearchTools {
-	public class LinkAnalyzer : System.IDisposable {
+	public class LinkAnalyzer : /*System.IDisposable*/ScriptableSingleton<LinkAnalyzer> {
 
+		[System.Serializable]
 		public struct AssetUniqueID {
 			public string guid;
 			public int fileID;
@@ -462,27 +464,31 @@ namespace SearchTools {
 		/// <summary>
 		/// 解析進捗
 		/// </summary>
+		[SerializeField]
 		private float analyzeProgress = 0.0f;
 
 		/// <summary>
 		/// 解析進捗範囲
 		/// </summary>
+		[SerializeField]
 		private Vector2 analyzeProgressRange = new Vector2(0.0f, 1.0f);
 
 		/// <summary>
 		/// 解析進捗カウント
 		/// </summary>
+		[SerializeField]
 		private float analyzeProgressDelta = 0.0f;
 
 		/// <summary>
 		/// 解析進捗カウント
 		/// </summary>
+		[SerializeField]
 		private float analyzeProgressCount = 0.0f;
 
 		/// <summary>
 		/// 解析パス
 		/// </summary>
-		private static readonly string dataBasePath = Application.dataPath.Substring(0, Application.dataPath.Length - 6); //末端の"Assets"を削除
+		private static string dataBasePath;
 
 		/// <summary>
 		/// サブアセットマッチング正規表現
@@ -517,6 +523,7 @@ namespace SearchTools {
 		/// <summary>
 		/// リンク情報
 		/// </summary>
+		[System.Serializable]
 		private struct LinkInfo {
 			public List<AssetUniqueID> links;
 			public string spritePackingTag;
@@ -525,6 +532,7 @@ namespace SearchTools {
 		/// <summary>
 		/// アセット情報
 		/// </summary>
+		[System.Serializable]
 		private class AssetInfo {
 			public IncludeStateFlags state;
 			public LinkInfo linkInfo;
@@ -562,42 +570,75 @@ namespace SearchTools {
 		/// <summary>
 		/// 解析結果
 		/// </summary>
-		private Dictionary<AssetUniqueID, AssetInfo> analyzeData = null;
+		[System.Serializable]
+		private class Dic_AssetUniqueID_AssetInfo : SerializableDictionary<AssetUniqueID, AssetInfo>
+		{
+			
+		}
+		[SerializeField]
+		private Dic_AssetUniqueID_AssetInfo analyzeData = null;
 
 		/// <summary>
 		/// GUIDパス梱包結果
 		/// </summary>
-		private Dictionary<string, IsIncludeReturn> includeGuid = null;
+		[System.Serializable]
+		private class Dic_string_IsIncludeReturn : SerializableDictionary<string, IsIncludeReturn>
+		{
+			
+		}
+		[SerializeField]
+		private Dic_string_IsIncludeReturn includeGuid = null;
 
 		/// <summary>
 		/// GUIDアセットバンドル梱包結果
 		/// </summary>
-		private Dictionary<string, IsIncludeReturn> assetBundleIncludeGuid = null;
+		[SerializeField]
+		private Dic_string_IsIncludeReturn assetBundleIncludeGuid = null;
 
 		/// <summary>
 		/// 梱包シーンパス
 		/// </summary>
+		[SerializeField]
 		private string[] includeScenePaths = null;
 
 		/// <summary>
 		/// GUIDパス変換辞書
 		/// </summary>
-		private Dictionary<string, string> guidToPath = null;
+		[System.Serializable]
+		private class Dic_string_string : SerializableDictionary<string, string>
+		{
+			
+		}
+		[SerializeField]
+		private Dic_string_string guidToPath = null;
 
 		/// <summary>
 		/// パスメインユニークID変換辞書
 		/// </summary>
-		private Dictionary<string, string> pathToGuid = null;
+		[SerializeField]
+		private Dic_string_string pathToGuid = null;
 
 		/// <summary>
 		/// アセットバンドル梱包バス辞書
 		/// </summary>
-		private Dictionary<string, string[]> assetPathsFromAssetBundle = null;
+		[System.Serializable]
+		private class Dic_string_stringArray : SerializableDictionary<string, string[]>
+		{
+			
+		}
+		[SerializeField]
+		private Dic_string_stringArray assetPathsFromAssetBundle = null;
 
 		/// <summary>
 		/// アセットバンドルリンク辞書
 		/// </summary>
-		private Dictionary<string, string[]> assetBundleLinks = null;
+		[SerializeField]
+		private Dic_string_stringArray assetBundleLinks = null;
+
+		private void OnEnable()
+		{
+			dataBasePath = Application.dataPath.Substring(0, Application.dataPath.Length - 6); //末端の"Assets"を削除
+		}
 
 		/// <summary>
 		/// 解析進捗設定
@@ -642,38 +683,38 @@ namespace SearchTools {
 
 			includeScenePaths = null;
 			if (analyzeData == null) {
-				analyzeData = new Dictionary<AssetUniqueID, AssetInfo>();
+				analyzeData = new Dic_AssetUniqueID_AssetInfo();
 			} else {
 				analyzeData.Clear();
 			}
 			if (includeGuid == null) {
-				includeGuid = new Dictionary<string, IsIncludeReturn>();
+				includeGuid = new Dic_string_IsIncludeReturn();
 			} else {
 				includeGuid.Clear();
 			}
 			if (assetBundleIncludeGuid == null) {
-				assetBundleIncludeGuid = new Dictionary<string, IsIncludeReturn>();
+				assetBundleIncludeGuid = new Dic_string_IsIncludeReturn();
 			} else {
 				assetBundleIncludeGuid.Clear();
 			}
 			if (guidToPath == null) {
-				guidToPath = new Dictionary<string, string>();
+				guidToPath = new Dic_string_string();
 			} else {
 				guidToPath.Clear();
 			}
 			if (pathToGuid == null) {
-				pathToGuid = new Dictionary<string, string>();
+				pathToGuid = new Dic_string_string();
 			} else {
 				pathToGuid.Clear();
 			}
 
 			if (assetPathsFromAssetBundle == null) {
-				assetPathsFromAssetBundle = new Dictionary<string, string[]>();
+				assetPathsFromAssetBundle = new Dic_string_stringArray();
 			} else {
 				assetPathsFromAssetBundle.Clear();
 			}
 			if (assetBundleLinks == null) {
-				assetBundleLinks = new Dictionary<string, string[]>();
+				assetBundleLinks = new Dic_string_stringArray();
 			} else {
 				assetBundleLinks.Clear();
 			}
