@@ -93,6 +93,13 @@ namespace SearchTools {
 		public  bool analyzing {get{
 			return (analyzeOnMainThreadUpdate != null) || (analyzeThread != null);
 		}}
+		
+		/// <summary>
+		/// 解析の中断状態確認
+		/// </summary>
+		public  bool suspending {get{
+			return analyzeThreadPause;
+		}}
 
 		/// <summary>
 		/// 解析スレッド
@@ -113,6 +120,10 @@ namespace SearchTools {
 				analyzeThread.Abort();
 #endif
 				analyzeThread = null;
+			}
+			if (analyzeThreadAutoReset != null)
+			{
+				analyzeThreadAutoReset = null;
 			}
 		}
 
@@ -411,6 +422,44 @@ namespace SearchTools {
 			analyzeProgress = 0.0f;
 			Start();
 		}
+		
+		/// <summary>
+		/// 一時停止
+		/// </summary>
+		public void Pause() {
+			if(analyzeOnMainThreadUpdate != null) {
+				analyzeOnMainThreadUpdate = null;
+			}
+			if(analyzeThread != null) {
+				analyzeThreadPause = true;
+			}
+		}
+
+		/// <summary>
+		/// 一時停止の再開
+		/// </summary>
+		public void Continue() {
+			if(analyzeOnMainThreadUpdate == null) {
+				analyzeOnMainThreadUpdate = AnalyzeOnMainThread();
+			}
+			if(analyzeThread != null) {
+				analyzeThreadPause = false;
+#if !SEARCH_TOOLS_DEBUG
+				if (analyzeThread.ThreadState == ThreadState.WaitSleepJoin)
+				{
+					if (analyzeThreadAutoReset != null)
+					{
+						analyzeThreadAutoReset.Set();
+					}
+				}
+#endif
+			}
+			else
+			{
+				analyzeProgress = 0.0f;
+				Start();
+			}
+		}
 
 		/// <summary>
 		/// メインスレッド解析のフレーム毎稼動上限秒
@@ -430,6 +479,8 @@ namespace SearchTools {
 #else
 		private Thread analyzeThread = null;
 #endif
+		private AutoResetEvent analyzeThreadAutoReset = null;
+		private bool analyzeThreadPause = false;
 
 		/// <summary>
 		/// 解析進捗の区切り(～GUID辞書生成)
@@ -718,6 +769,11 @@ namespace SearchTools {
 			} else {
 				assetBundleLinks.Clear();
 			}
+			
+			#if !SEARCH_TOOLS_DEBUG
+				analyzeThreadPause = false;
+				analyzeThreadAutoReset = new AutoResetEvent(false);
+			#endif
 
 			analyzeOnMainThreadUpdate = AnalyzeOnMainThread();
 			EditorApplication.update += AnalyzeOnMainThreadUpdate;
@@ -851,6 +907,12 @@ namespace SearchTools {
 		/// </summary>
 		private void AnalyzeForScriptsAndStreamingAssets() {
 			foreach (var ptg in pathToGuid) {
+				//一時停止処理
+				if (analyzeThreadPause)
+				{
+					analyzeThreadAutoReset.WaitOne();
+				}
+
 				var path = ptg.Key;
 
 				var linkerType = GetLinkerType(path);
@@ -905,6 +967,12 @@ namespace SearchTools {
 			}
 
 			while (0 < analyzeQueue.Count) {
+				//一時停止処理
+				if (analyzeThreadPause)
+				{
+					analyzeThreadAutoReset.WaitOne();
+				}
+
 				var analyzeUniqueID = analyzeQueue.Dequeue();
 				var analyzePath = guidToPath[analyzeUniqueID.guid];
 
@@ -1454,6 +1522,12 @@ namespace SearchTools {
 		/// </summary>
 		private void ExcludeForLeftovers() {
 			foreach(var analyzePath in pathToGuid.Keys) {
+				//一時停止処理
+				if (analyzeThreadPause)
+				{
+					analyzeThreadAutoReset.WaitOne();
+				}
+
 				var analyzeUniqueID = new AssetUniqueID(pathToGuid[analyzePath]);
 
 				var includeCount = 0;
@@ -1500,6 +1574,12 @@ namespace SearchTools {
 			SetAnalyzeProgressRange(analyzeProgressFileIDNormalize, analyzeData.Count);
 
 			foreach(var dat in analyzeData) {
+				//一時停止処理
+				if (analyzeThreadPause)
+				{
+					analyzeThreadAutoReset.WaitOne();
+				}
+
 				var assetInfo = dat.Value;
 				if (assetInfo.links != null) {
 					var uniqueID = dat.Key;
@@ -1538,6 +1618,12 @@ namespace SearchTools {
 			SetAnalyzeProgressRange(analyzeProgressInboundLink, analyzeData.Count * 2);
 
 			foreach(var dat in analyzeData) {
+				//一時停止処理
+				if (analyzeThreadPause)
+				{
+					analyzeThreadAutoReset.WaitOne();
+				}
+
 				if (IsSpritePackingTag(dat.Key)) {
 					IncrementAnalyzeProgress();
 					continue;

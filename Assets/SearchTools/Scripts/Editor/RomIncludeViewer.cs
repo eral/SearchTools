@@ -135,6 +135,11 @@ namespace SearchTools {
 		private LinkAnalyzer linkAnalyzerField = null;
 
 		/// <summary>
+		/// 直前のフレームでEditorApplicationが再生されているかどうか
+		/// </summary>
+		private bool prevPlaying = false;
+
+		/// <summary>
 		/// 梱包判定アイコン
 		/// </summary>
 		private static Texture2D[] includeIcons;
@@ -173,6 +178,23 @@ namespace SearchTools {
 				}
 			}
 #endif
+			if (linkAnalyzer.analyzing)
+			{
+				if (linkAnalyzer.suspending)
+				{
+					if (GUILayout.Button("Continue", EditorStyles.toolbarButton, GUILayout.Width(60)))
+					{
+						ContinueAnalyze();
+					}
+				}
+				else
+				{
+					if (GUILayout.Button("Suspend", EditorStyles.toolbarButton, GUILayout.Width(60)))
+					{
+						SuspendAnalyze();
+					}
+				}
+			}
 			{
 				var progressBarPosition = GUILayoutUtility.GetRect(60.0f, EditorStyles.toolbar.fixedHeight);
 				if (linkAnalyzer.analyzing) {
@@ -267,7 +289,7 @@ namespace SearchTools {
 
 			var currentFoldoutUniqueID = parentFoldoutUniqueID + "/" + uniqueID;
 			if (!linkViewStates[(int)analyzeMode].Foldouts.ContainsKey(currentFoldoutUniqueID)) {
-				bool foldoutValue = (EditorGUI.indentLevel < 3);	//三層目まではFoldoutを最初から開いておく
+				bool foldoutValue = (EditorGUI.indentLevel < 1);	//最初だけはFoldoutを開いておく
 				linkViewStates[(int)analyzeMode].Foldouts.Add(currentFoldoutUniqueID, foldoutValue);
 			}
 			var foldout = linkViewStates[(int)analyzeMode].Foldouts[currentFoldoutUniqueID];
@@ -466,6 +488,14 @@ namespace SearchTools {
 			if (!linkAnalyzer.analyzing) {
 				EditorApplication.update -= AnalyzingUpdate;
 			}
+			else
+			{
+				if (EditorApplication.isPlayingOrWillChangePlaymode && !prevPlaying)
+				{
+					linkAnalyzer.Pause();
+				}
+				prevPlaying = EditorApplication.isPlaying;
+			}
 		}
 
 		/// <summary>
@@ -484,5 +514,30 @@ namespace SearchTools {
 			linkAnalyzer.Refresh();
 			EditorApplication.update += AnalyzingUpdate;
 		}
+		
+		/// <summary>
+		/// 解析の一時停止
+		/// </summary>
+		private void SuspendAnalyze()
+		{
+			if (linkAnalyzer.analyzing)
+			{
+				EditorApplication.update -= AnalyzingUpdate;
+				linkAnalyzer.Pause();
+			}
+		}
+
+		/// <summary>
+		/// 解析の再開
+		/// </summary>
+		private void ContinueAnalyze()
+		{
+			if (linkAnalyzer.analyzing)
+			{
+				EditorApplication.update += AnalyzingUpdate;
+				linkAnalyzer.Continue();
+			}
+		}
+
 	}
 }
