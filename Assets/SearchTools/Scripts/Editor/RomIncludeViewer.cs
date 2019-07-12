@@ -267,7 +267,8 @@ namespace SearchTools {
 
 			var currentFoldoutUniqueID = parentFoldoutUniqueID + "/" + uniqueID;
 			if (!linkViewStates[(int)analyzeMode].Foldouts.ContainsKey(currentFoldoutUniqueID)) {
-				linkViewStates[(int)analyzeMode].Foldouts.Add(currentFoldoutUniqueID, true);
+				bool foldoutValue = (EditorGUI.indentLevel < 3);	//三層目まではFoldoutを最初から開いておく
+				linkViewStates[(int)analyzeMode].Foldouts.Add(currentFoldoutUniqueID, foldoutValue);
 			}
 			var foldout = linkViewStates[(int)analyzeMode].Foldouts[currentFoldoutUniqueID];
 
