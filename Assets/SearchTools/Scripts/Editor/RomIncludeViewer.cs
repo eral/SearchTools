@@ -441,13 +441,13 @@ namespace SearchTools {
 				pos.width = pos.height;
 			}
 			var path = AssetDatabase.GUIDToAssetPath(guid);
-			var include = IsInclude(path);
 			//higuchi ProjectWindowへのアイコン描画は行わない
+			//var include = IsInclude(path);
 			//GUI.DrawTexture(pos, includeIcons[(int)include]);
 			//end higuchi
 			pos.x -= pos.width;
-			var assetBundleInclude = IsAssetBundleInclude(path);
 			//higuchi ProjectWindowへのアイコン描画は行わない
+			//var assetBundleInclude = IsAssetBundleInclude(path);
 			//GUI.DrawTexture(pos, assetBundleIcons[(int)assetBundleInclude]);
 			//end higuchi
 		}

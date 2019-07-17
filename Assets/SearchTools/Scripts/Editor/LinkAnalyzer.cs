@@ -11,7 +11,6 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Text;
-using SerializableCollections;
 
 namespace SearchTools {
 	public class LinkAnalyzer : /*System.IDisposable*/ScriptableSingleton<LinkAnalyzer> {
